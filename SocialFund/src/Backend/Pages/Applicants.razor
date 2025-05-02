@@ -1,0 +1,431 @@
+@page "/applicants"
+@using Microsoft.AspNetCore.Components.Forms
+@using Backend.Shared
+@using Backend.Data
+@inject Backend.Data.SocialFundDbContext DbContext
+@inject IServiceScopeFactory ScopeFactory
+@inject UserSessionService UserSession
+
+<h3>Applicants</h3>
+
+@if (isLoading)
+{
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+
+<EditForm Model="newApplicant" OnValidSubmit="SaveApplicant">
+    <DataAnnotationsValidator />
+    <ValidationSummary /> 
+    <FormLayout>
+        <div id="appID" class="col-md-3">
+            <div class="d-flex align-items-center">
+                <Input type="number" id="applicantId" class="form-control me-2" @bind-Value="@newApplicant.ApplicantID" @bind-Value:event="oninput" @onchange="OnApplicantIdChanged" readonly="@(isEditing)"/>
+                <button id="applicantSearchButton" type="button" class="btn btn-primary" @onclick="ShowSearchModal">
+                    <span class="oi oi-magnifying-glass"></span>
+                </button>
+            </div>
+        </div>
+        <div class="row">
+            <div id="dataEntryLeft" class="col-md-6">
+                <div class="form-group">
+                    <label for="firstName">First Name</label><InputText id="firstName" class="form-control" @bind-Value="newApplicant.FirstName" disabled="@(!isEditing)" />
+                    @* ValueExpression="@(() => newApplicant.FirstName)" *@
+                </div>
+                <div class="form-group">
+                    <label for="middleName">Middle Name</label>
+                    <InputText id="middleName" class="form-control" @bind-Value="newApplicant.MiddleName" disabled="@(!isEditing)" />
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <InputText id="lastName" class="form-control" @bind-Value="newApplicant.LastName" disabled="@(!isEditing)" />
+                </div>
+                <div class="form-group">
+                    <label for="idNumber">ID Number</label>
+                    <InputText id="idNumber" class="form-control" @bind-Value="newApplicant.IDNumber" disabled="@(!isEditing)" maxlength="20"/>
+                </div>
+                <div class="form-group">
+                    <label for="contactNumber">Contact Number</label>
+                    <InputText id="contactNumber" class="form-control" @bind-Value="newApplicant.ContactNumber" disabled="@(!isEditing)" />
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <InputText id="email" class="form-control" @bind-Value="newApplicant.Email" disabled="@(!isEditing)" />
+                </div>
+                <div class="form-group">
+                    <label for="sexDropdown">Sex</label>
+                    <select id="sexDropdown" class="form-control" @bind="newApplicant.SexID" disabled="@(!isEditing)">
+                        <option value="">Select Sex</option>
+                        @foreach (var sex in sexDropdown)
+                        {
+                            <option value="@sex.SexID">@sex.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div id="apAddress" class="col-md-6">
+                <div class="form-group">
+                    <label for="maritalDropdown">Marital Status</label>
+                    <select id="maritalDropdown" class="form-control" @bind="newApplicant.MaritalStatusID" disabled="@(!isEditing)">  
+                        <option value="">Select Marital Status</option>
+                        @foreach (var status in maritalDropdown)
+                        {
+                            <option value="@status.MaritalStatusID">@status.Name</option>
+                        }
+                    </select>
+                </div>
+                <Address OnVillageSelected="OnVillageSelected" IsEditing="@isEditing" SelectedVillageId="@selectedVillageID"/>
+            </div>
+        </div>
+        <div id="behindScene">
+            <div class="form-group">
+                <label>Created On</label>
+                <InputDate class="form-control" @bind-Value="newApplicant.CreatedOn" disabled />
+                @* <input class="form-control" value="@(DateTime.TryParse(newApplicant.CreatedOn, out var createdOn) ? createdOn.ToString("yyyy-MM-dd HH:mm:ss") : string.Empty)" disabled /> *@
+            </div>
+            <div class="form-group">
+                <label>Created By</label>
+                <InputText class="form-control" Value="" ValueExpression=@(() => newApplicant.CreatedBy) disabled />
+            </div>
+            <div class="form-group">
+                <label>Modified On</label>
+                <InputDate class="form-control" @bind-Value="newApplicant.ModifiedOn" disabled />
+                @* <input class="form-control" value="@(DateTime.TryParse(newApplicant.ModifiedOn, out var modifiedOn) ? modifiedOn.ToString("yyyy-MM-dd HH:mm:ss") : string.Empty)" disabled /> *@
+            </div>
+            <div class="form-group">
+                <label>Modified By</label>
+                <InputText class="form-control" Value="" ValueExpression=@(() => newApplicant.ModifiedBy) disabled />
+            </div>
+        </div>
+    </FormLayout>
+
+    <div style="margin-top: 1rem;"></div>
+
+    <button type="button" class="btn btn-success me-2" @onclick="AddNewApplicant" disabled="@(isEditing)">Add</button>
+    <button type="button" class="btn btn-warning me-2" @onclick="EditApplicant" disabled="@(newApplicant.ApplicantID == 0)">Edit</button>
+    <button type="button" class="btn btn-primary me-2" @onclick="SaveApplicant" disabled="@(!isEditing || isSaving)">Save</button>
+    <button type="button" class="btn btn-danger me-2" @onclick="CancelEdit" disabled="@(!isEditing)">Cancel</button>
+</EditForm>
+<SearchApplicantModal @bind-IsOpen="isSearchModalOpen" OnApplicantSelected="OnApplicantSelected" />
+
+<div class="mt-5">
+    <h5>Existing Applicants</h5>
+    <table id="=tblapplicants" class="table table-striped">
+        <thead>
+            <tr>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>ID Number</th>
+                <th>Contact Number</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var applicant in applicants)
+            {
+                <tr @onclick="() => LoadApplicantDetails(applicant)">
+                    <td>@applicant.FirstName</td>
+                    <td>@applicant.LastName</td>
+                    <td>@applicant.IDNumber</td>
+                    <td>@applicant.ContactNumber</td>
+                    <td>@applicant.Email</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage - 1)" disabled="@((currentPage == 1))">Previous</button>
+        <span>Page @currentPage of @totalPages</span>
+        <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage + 1)" disabled="@((currentPage == totalPages))">Next</button>
+    </div>
+</div>
+
+<style>
+    #behindScene {
+        display: none;
+    }
+</style>
+}
+@code {
+    private bool isLoading = true;
+    private string? UserId;
+    private Applicant newApplicant = new Applicant
+    {
+        ApplicantID = 0,
+        FirstName = string.Empty,
+        MiddleName = null,
+        LastName = string.Empty,
+        IDNumber = string.Empty,
+        ContactNumber = null,
+        Email = null,
+        SexID = 0,
+        MaritalStatusID = 0,
+        VillageID = 0,
+        CreatedOn = DateTime.Now,
+        CreatedBy = null,
+        ModifiedOn = null,
+        ModifiedBy = null
+    };
+
+    private List<Applicant> applicants;// = new();
+    private List<Sex> sexDropdown = new();
+    private List<MaritalStatus> maritalDropdown; // = new();
+    private bool isSearchModalOpen = false;
+    private int currentPage = 1;
+    private int pageSize = 2;
+    private int totalPages = 5;
+    private int totalApplicants = 0; // Ensure proper initialization
+    private int selectedVillageID =0;
+    private bool isEditing = false;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            ToggleFields(false);
+            UserId = UserSession.GetUserID();
+            await LoadDropdownsAsync();
+            await LoadApplicantsAsync();
+            selectedVillageID = 0; // Ensure Address form fields are also disabled
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions (e.g., log them)
+            Console.WriteLine($"Error loading Applicants: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadDropdownsAsync()
+    {
+        if (sexDropdown.Any() && maritalDropdown.Any())
+        {
+            // If already populated, exit early to prevent unnecessary database calls
+            return;
+        }
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Data.SocialFundDbContext>();
+        var Lookups = await db.GetLookupAsync("Sex,Marital");
+        sexDropdown = Lookups
+            .Where(l => l.LookupGroupCode == "Sex")
+            .Select(l => new Sex { SexID = l.LookupID, Name = l.LookupName ?? string.Empty })
+            .ToList();
+
+        maritalDropdown = Lookups
+            .Where(l => l.LookupGroupCode == "Marital")
+            .Select(l => new MaritalStatus { MaritalStatusID = l.LookupID, Name = l.LookupName ?? string.Empty })
+            .ToList();
+    }
+
+    private async Task LoadApplicantsAsync(int page = 1)
+    {
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<Data.SocialFundDbContext>();
+            // Get total count for pagination
+            //var allResults = await db.GetApplicantAsync(null, null, 1, 2);
+            totalApplicants = 10;// allResults.Count;
+            //totalPages = (int)Math.Ceiling(totalApplicants / (double)pageSize);
+            currentPage = page;
+
+            // Get only the current page
+            var results = await db.GetApplicantAsync(null, null, page, pageSize);
+            applicants = results.Select(a => new Applicant
+            {
+                ApplicantID = a.ApplicantID,
+                FirstName = a.FirstName,
+                MiddleName = a.MiddleName,
+                LastName = a.LastName,
+                IDNumber = a.IDNumber,
+                ContactNumber = a.ContactNumber,
+                Email = a.Email,
+                SexID = a.SexID,
+                MaritalStatusID = a.MaritalStatusID,
+                VillageID = a.VillageID,
+                CreatedOn = a.CreatedOn,
+                CreatedBy = a.CreatedBy,
+                ModifiedOn = a.ModifiedOn,
+                ModifiedBy = a.ModifiedBy
+            }).ToList();
+            totalApplicants = results.FirstOrDefault()?.TotalCount ?? 0;
+            totalPages = (int)Math.Ceiling(totalApplicants / (double)pageSize);
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error loading applicants: {ex.Message}",true);
+        }
+    }
+
+    private async Task SaveApplicant()
+    {
+        if (string.IsNullOrWhiteSpace(newApplicant.FirstName) ||
+            string.IsNullOrWhiteSpace(newApplicant.LastName) ||
+            string.IsNullOrWhiteSpace(newApplicant.IDNumber) ||
+            newApplicant.SexID == 0 ||
+            newApplicant.MaritalStatusID == 0 ||
+            selectedVillageID == 0)
+        {
+            GlobalErrorHandler.ShowMessage("Please fill in all required fields before saving.",true);
+            return;
+        }
+
+        isSaving = true; // Disable the Save button
+
+        try
+        {
+            // Map the form model to the backend Applicant model
+            var applicant = new Applicant
+            {
+                ApplicantID = newApplicant.ApplicantID,
+                FirstName = newApplicant.FirstName,
+                MiddleName = newApplicant.MiddleName,
+                LastName = newApplicant.LastName,
+                IDNumber = newApplicant.IDNumber,
+                ContactNumber = newApplicant.ContactNumber,
+                Email = newApplicant.Email,
+                SexID = newApplicant.SexID, 
+                MaritalStatusID = newApplicant.MaritalStatusID,
+                VillageID = selectedVillageID,
+                CreatedBy = UserId,
+            };
+            await DbContext.AddEditApplicantAsync(applicant);
+            await LoadApplicantsAsync(); // Refresh table after save
+            newApplicant = new Applicant();
+            ToggleFields(false); // Disable fields after save
+            GlobalErrorHandler.ShowMessage($"Applicant saved successfully!");
+        }
+        catch (Exception ex)
+        {
+            isSaving = false; // Re-enable the Save button
+            GlobalErrorHandler.ShowMessage($"Error saving applicant: {ex.Message}");
+        }
+    }
+
+    private void OnVillageSelected(int villageId)
+    {
+       selectedVillageID = villageId;
+    }
+
+    private async Task SearchApplicantByIdOrIdNumber()
+    {
+        int  applicantId = newApplicant.ApplicantID;
+        string idNumber = null;// newApplicant.IDNumber;
+        var results = await DbContext.GetApplicantAsync(applicantId, string.IsNullOrWhiteSpace(idNumber) ? null : idNumber, 1, 1);
+        var myapplicant = results.FirstOrDefault();
+        if (myapplicant != null)
+        {
+            newApplicant.FirstName = myapplicant.FirstName;
+            newApplicant.MiddleName = myapplicant.MiddleName;
+            newApplicant.LastName = myapplicant.LastName;
+            newApplicant.IDNumber = myapplicant.IDNumber;
+            newApplicant.ContactNumber = myapplicant.ContactNumber;
+            newApplicant.Email = myapplicant.Email;
+            newApplicant.SexID = myapplicant.SexID; 
+            newApplicant.MaritalStatusID = myapplicant.MaritalStatusID; 
+            newApplicant.VillageID = myapplicant.VillageID;
+            selectedVillageID = myapplicant.VillageID;
+            newApplicant.CreatedOn = myapplicant.CreatedOn;
+            newApplicant.CreatedBy = myapplicant.CreatedBy ?? string.Empty;
+            newApplicant.ModifiedOn = myapplicant.ModifiedOn;
+            newApplicant.ModifiedBy = myapplicant.ModifiedBy ?? string.Empty;
+        }
+    }
+
+    private async void OnApplicantIdKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Tab" || e.Key == "Enter")
+        {
+            //StateHasChanged();
+            Console.WriteLine($"Key pressed: {e.Key}, Current Applicant ID: {newApplicant.ApplicantID}");
+            // Manually create a ChangeEventArgs instance to trigger OnApplicantIdChanged
+            var changeEventArgs = new ChangeEventArgs { Value = newApplicant.ApplicantID };
+            await OnApplicantIdChanged(changeEventArgs);
+        }
+    }
+
+    private async Task OnApplicantIdChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var applicantId))
+        {
+            if (applicantId == 0)
+                return;
+            newApplicant.ApplicantID = applicantId;
+            Console.WriteLine($"Applicant ID Changed: {newApplicant.ApplicantID}");
+            await SearchApplicantByIdOrIdNumber();
+        }
+    }
+
+    private void ShowSearchModal()
+    {
+        isSearchModalOpen = true;
+    }
+
+    private async Task OnApplicantSelected(int applicantId)
+    {
+        newApplicant.ApplicantID = applicantId;
+        await SearchApplicantByIdOrIdNumber();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > totalPages) return;
+        await LoadApplicantsAsync(page);
+    }
+
+    private void AddNewApplicant()
+    {
+        newApplicant = new Applicant();
+        ToggleFields(true);
+    }
+
+    private void EditApplicant()
+    {
+        // Logic for editing an applicant can be added here
+        ToggleFields(true);
+    }
+
+    private void ToggleFields(bool enable)
+    {
+        isEditing = enable;
+        if (newApplicant.ApplicantID == 0)
+            selectedVillageID = 0; // Reset the village dropdown
+    }
+
+    private void CancelEdit()
+    {
+        // Reset the state of add/edit
+        newApplicant = new Applicant();
+        ToggleFields(false); // Disable editing fields
+    }
+
+    private void LoadApplicantDetails(Applicant applicant)
+    {
+        newApplicant = new Applicant
+        {
+            ApplicantID = applicant.ApplicantID,
+            FirstName = applicant.FirstName,
+            MiddleName = applicant.MiddleName,
+            LastName = applicant.LastName,
+            IDNumber = applicant.IDNumber,
+            ContactNumber = applicant.ContactNumber,
+            Email = applicant.Email,
+            SexID = applicant.SexID,
+            MaritalStatusID = applicant.MaritalStatusID,
+            VillageID = applicant.VillageID,
+            CreatedOn = applicant.CreatedOn,
+            CreatedBy = applicant.CreatedBy,
+            ModifiedOn = applicant.ModifiedOn,
+            ModifiedBy = applicant.ModifiedBy
+        };
+        selectedVillageID = applicant.VillageID;
+        ToggleFields(false); // Disable fields after loading details
+    }
+}

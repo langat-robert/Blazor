@@ -1,0 +1,159 @@
+@page "/application-form"
+@using System.ComponentModel.DataAnnotations
+
+<h3>Application Form</h3>
+
+<EditForm Model="applicationForm" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="applicationDate">Application Date</label>
+        <InputDate id="applicationDate" class="form-control" @bind-Value="applicationForm.ApplicationDate" />
+    </div>
+
+    <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <InputText id="fullName" class="form-control" Value="applicationForm.FullName" />
+    </div>
+
+    <div class="form-group">
+        <label for="sex">Sex</label>
+        <InputSelect id="sex" class="form-control" @bind-Value="applicationForm.Sex">
+            <option value="">Select</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+        </InputSelect>
+    </div>
+
+    <div class="form-group">
+        <label for="age">Age</label>
+        <InputNumber id="age" class="form-control" @bind-Value="applicationForm.Age" />
+    </div>
+
+    <div class="form-group">
+        <label for="maritalStatus">Marital Status</label>
+        <InputSelect id="maritalStatus" class="form-control" @bind-Value="applicationForm.MaritalStatus">
+            <option value="">Select</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+        </InputSelect>
+    </div>
+
+    <div class="form-group">
+        <label for="idNumber">ID/Passport Number</label>
+        <InputText id="idNumber" class="form-control" Value="applicationForm.IDNumber" />
+    </div>
+
+    <div class="form-group">
+        <label for="county">County</label>
+        <InputText id="county" class="form-control" Value="applicationForm.County" />
+    </div>
+
+    <div class="form-group">
+        <label for="subCounty">Sub-County</label>
+        <InputText id="subCounty" class="form-control" Value="applicationForm.SubCounty" />
+    </div>
+
+    <div class="form-group">
+        <label for="location">Location</label>
+        <InputText id="location" class="form-control" Value="applicationForm.Location" />
+    </div>
+
+    <div class="form-group">
+        <label for="subLocation">Sub-Location</label>
+        <InputText id="subLocation" class="form-control" Value="applicationForm.SubLocation" />
+    </div>
+
+    <div class="form-group">
+        <label for="village">Village</label>
+        <InputText id="village" class="form-control" Value="applicationForm.Village" />
+    </div>
+
+    <div class="form-group">
+        <label for="postalAddress">Postal Address</label>
+        <InputText id="postalAddress" class="form-control" Value="applicationForm.PostalAddress" />
+    </div>
+
+    <div class="form-group">
+        <label for="physicalAddress">Physical Address</label>
+        <InputText id="physicalAddress" class="form-control" Value="applicationForm.PhysicalAddress" />
+    </div>
+
+    <div class="form-group">
+        <label for="telephone">Telephone Contacts</label>
+        <InputText id="telephone" class="form-control" Value="applicationForm.Telephone" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Submit</button>
+</EditForm>
+
+@code {
+    private ApplicationForm applicationForm = new ApplicationForm();
+
+    private void LogApplicationFormState(string context)
+    {
+        Console.WriteLine($"[{context}] ApplicationForm State: {System.Text.Json.JsonSerializer.Serialize(applicationForm)}");
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LogApplicationFormState("OnInitialized");
+    }
+
+    private void HandleValidSubmit()
+    {
+        LogApplicationFormState("OnValidSubmit");
+        // Handle form submission logic here
+    }
+
+    public class ApplicationForm
+    {
+        [Required]
+        public DateTime ApplicationDate { get; set; }
+
+        [Required]
+        public string FullName { get; set; }
+
+        [Required]
+        public string Sex { get; set; }
+
+        [Range(0, 120)]
+        public int Age { get; set; }
+
+        [Required]
+        public string MaritalStatus { get; set; }
+
+        [Required]
+        public string IDNumber { get; set; }
+
+        public string County { get; set; }
+        public string SubCounty { get; set; }
+        public string Location { get; set; }
+        public string SubLocation { get; set; }
+        public string Village { get; set; }
+        public string PostalAddress { get; set; }
+        public string PhysicalAddress { get; set; }
+        public string Telephone { get; set; }
+
+        public ApplicationForm()
+        {
+            ApplicationDate = DateTime.Now;
+            FullName = string.Empty;
+            Sex = string.Empty;
+            MaritalStatus = string.Empty;
+            IDNumber = string.Empty;
+            County = string.Empty;
+            SubCounty = string.Empty;
+            Location = string.Empty;
+            SubLocation = string.Empty;
+            Village = string.Empty;
+            PostalAddress = string.Empty;
+            PhysicalAddress = string.Empty;
+            Telephone = string.Empty;
+        }
+    }
+}

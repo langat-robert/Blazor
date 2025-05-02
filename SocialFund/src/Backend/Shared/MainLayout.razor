@@ -1,0 +1,92 @@
+﻿@inherits LayoutComponentBase
+
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Backend</PageTitle>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="message" style="display: @(string.IsNullOrEmpty(Message) ? "none" : "block"); color: @(IsError ? "red" : "green");">
+                @Message
+            </div>
+            @Body
+        </div>
+        <footer class="footer">
+            <p>&copy; 2025 Social Assistance Fund System. All rights reserved.</p>
+        </footer>
+    </div>
+</div>
+
+<style>
+    .sidebar {
+        width: 250px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background-color: #f8f9fa;
+        padding: 1rem;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .main-content {
+        margin-left: 250px;
+        padding: 1rem;
+    }
+
+    .footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-top: 1px solid #e7e7e7;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsError { get; set; } = false;
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = string.Empty;
+
+    [Parameter]
+    public string SuccessMessage { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        GlobalErrorHandler.OnMessage += HandleGlobalMessage;
+    }
+
+    private void HandleGlobalMessage(string message, bool isError)
+    {
+        Message = message;
+        IsError = isError;
+        StateHasChanged();
+    }
+
+    private void HandleGlobalError(string message)
+    {
+        ErrorMessage = message;
+        StateHasChanged();
+    }
+
+    private void HandleGlobalSuccess(string message)
+    {
+        SuccessMessage = message;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        GlobalErrorHandler.OnMessage -= HandleGlobalMessage;
+    }
+}

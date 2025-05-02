@@ -1,0 +1,547 @@
+@page "/application-management"
+@using Backend.Data
+@using Backend.Shared
+@inject SocialFundDbContext DbContext
+@inject IServiceScopeFactory ScopeFactory
+@inject UserSessionService UserSession
+@using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<div style="display: @(IsApproval ? "none" : "block")">
+    <h3>Application</h3>
+</div>
+<div style="display: @(!IsApproval ? "none" : "block")">
+    <h3>Approval</h3>
+</div>
+
+@if (isLoading)
+{
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+}
+else
+{
+    <EditForm Model="application" OnValidSubmit="SaveApplication">
+        <div class="row">
+            <div class="col-md-4">
+                <label>Application ID</label>
+                <div class="input-group">
+                    <Input type="number" class="form-control" @bind-Value="@application.ApplicationID" @bind-Value:event="oninput" @onchange="OnApplicationIdChanged" readonly="@(isEditing)" />
+                    <button type="button" class="btn btn-primary" @onclick="ShowSearchApplicationModal" disabled="@(isEditing)">
+                        <span class="oi oi-magnifying-glass"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label>Applicant ID</label>
+                <div class="input-group">
+                    <Input type="number" class="form-control" @bind-Value="@application.ApplicantID" @bind-Value:event="oninput" @onchange="OnApplicantIdChanged" readonly="@(!isEditing)" />
+                    <button type="button" class="btn btn-primary" @onclick="ShowSearchApplicantModal" disabled="@(!isEditing)">
+                        <span class="oi oi-magnifying-glass"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label>Full Name</label>
+                <InputText class="form-control" @bind-Value="application.FullName" readonly />
+            </div>
+            <div class="col-md-4">
+                <label>Contact Number</label>
+                <InputText class="form-control" @bind-Value="application.ContactNumber" readonly />
+            </div>
+            <div class="col-md-4">
+                <label>ID Number</label>
+                <InputText class="form-control" @bind-Value="application.IDNumber" readonly />
+            </div>
+            <div class="col-md-4">
+                <label>Application Date</label>
+                <InputDate class="form-control" @bind-Value="application.ApplicationDate" readonly="@(!isEditing)" />
+            </div>
+            <div class="col-md-4">
+                <label>Status</label>
+                <InputText class="form-control" @bind-Value="application.Status" readonly />
+            </div>
+        </div>
+
+        <h5>Programmes</h5>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Applied</th>
+                    <th>Programme Name</th>
+                    <th>Narration</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var programme in programmes)
+                {
+                    <tr>
+                        <td><InputCheckbox @bind-Value="programme.Applied" disabled="@(!isEditing)" /></td>
+                        <td>@programme.ProgrammeName</td>
+                        <td><InputText class="form-control" @bind-Value="programme.Narration" disabled="@(programme.Applied != true || isEditing == false)" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="mt-3" id="addEditbuttons" style="display: @(IsApproval ? "none" : "block")">
+            <button type="button" class="btn btn-success" @onclick="AddNewApplication" disabled="@(isEditing)">Add</button>
+            <button type="button" class="btn btn-warning" @onclick="EditApplication" disabled="@((application?.ApplicationID ?? 0) == 0)">Edit</button>
+            <button type="submit" class="btn btn-primary" disabled="@(!isEditing)">Save</button>
+            <button type="button" class="btn btn-danger" @onclick="CancelEdit" disabled="@(!isEditing)">Cancel</button>
+        </div>
+
+        <div class="mt-3" id="approvalbuttons" style="display: @(!IsApproval ? "none" : "block")">
+            <button type="button" class="btn btn-success" @onclick="@(() => PromptUser("Approve"))" disabled="@(isEditing)">Approve</button>
+            <button type="button" class="btn btn-success" @onclick="@(() => PromptUser("Reject"))" disabled="@(isEditing)">Reject</button>
+        </div>  
+    </EditForm>
+
+    <SearchApplicationModal @bind-IsASOpen="isSearchApplicationModalOpen" OnApplicationSelected="OnApplicationSelected" />
+    <SearchApplicantModal @bind-IsOpen="isSearchApplicantModalOpen" OnApplicantSelected="OnApplicantSelected" />
+    <ConfirmDialog @ref="confirmDialog" Title="Please Confirm" Message="Are you sure you want to proceed?" OnClose="HandleConfirmation" />
+
+    <div class="mt-5">
+        <h5>Existing Applications</h5>
+        <table id="tblapplicationss" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Application ID</th>
+                    <th>Full Name</th>
+                    <th>ID Number</th>
+                    <th>Contact Number</th>
+                    <th>Application Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var applicationT in applications)
+                {
+                    <tr @onclick="() => LoadApplicationDetails(applicationT)">
+                        <td>@applicationT.ApplicationID</td>
+                        <td>@applicationT.FullName</td>
+                        <td>@applicationT.IDNumber</td>
+                        <td>@applicationT.ContactNumber</td>
+                        <td>@applicationT.ApplicationDate?.ToShortDateString()</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage - 1)" disabled="@((currentPage == 1))">Previous</button>
+            <span>Page @currentPage of @totalPages</span>
+            <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage + 1)" disabled="@((currentPage == totalPages))">Next</button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private ConfirmDialog? confirmDialog;
+    private string? actionRequested;
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public bool IsApproval { get; set; } = false;
+
+    private string? UserId;
+    private Application application = new();
+    private List<Application> applications = new();
+    private List<AppProgramme> programmes = new();
+    private bool isSearchApplicationModalOpen = false;
+    private bool isSearchApplicantModalOpen = false;
+    private bool isEditing = false;
+
+    private int currentPage = 1;
+    private int pageSize = 2;
+    private int totalPages = 1;
+    private int totalApplicants = 0;
+
+    private Applicant newApplicant = new Applicant
+    {
+        ApplicantID = 0,
+        FirstName = string.Empty,
+        MiddleName = null,
+        LastName = string.Empty,
+        IDNumber = string.Empty,
+        ContactNumber = null,
+        Email = null,
+        SexID = 0,
+        MaritalStatusID = 0,
+        VillageID = 0,
+        CreatedOn = DateTime.Now,
+        CreatedBy = null,
+        ModifiedOn = null,
+        ModifiedBy = null
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("isApproval", out var isApprovalValue))
+        {
+            IsApproval = bool.TryParse(isApprovalValue, out var result) && result;
+        }
+
+        try
+        {
+            ToggleFields(false);
+            UserId = UserSession.GetUserID();
+            programmes = await DbContext.GetProgrammesAsync();
+            await LoadApplicationsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions (e.g., log them)
+            Console.WriteLine($"Error loading Applications: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+
+        await base.OnInitializedAsync();
+
+        if (IsApproval)
+        {
+            // Adjust logic for approval mode
+            Console.WriteLine("Approval mode enabled");
+        }
+    }
+
+    private void ShowSearchApplicationModal()
+    {
+        isSearchApplicationModalOpen = true;
+    }
+
+    private void ShowSearchApplicantModal()
+    {
+        isSearchApplicantModalOpen = true;
+    }
+
+    private async Task OnApplicationSelected(int applicationId)
+    {
+        application = (await DbContext.GetApplicationAsync(applicationId, null, 1, pageSize)).FirstOrDefault() ?? new Application();
+        programmes = await DbContext.GetProgrammesAsync(applicationId);
+    }
+
+    private async Task OnApplicantSelected(int applicantId)
+    {
+        var results = await DbContext.GetApplicantAsync(applicantId, null, 1, 1);
+        var newapplicant = results.FirstOrDefault();
+        if (newapplicant != null)
+        {
+            application.ApplicantID = newapplicant.ApplicantID;
+            application.FullName = $"{newapplicant.FirstName} {newapplicant.LastName}";
+            application.ContactNumber = newapplicant.ContactNumber;
+            application.IDNumber = newapplicant.IDNumber;
+            application.Email = newapplicant.Email;
+        }
+    }
+
+    private void AddNewApplication()
+    {
+        try
+        {
+            application = new Application
+            {
+                ApplicationDate = DateTime.Now,
+                Status = "New",
+                CreatedBy = UserId
+            };
+   
+            // Reset the programmes for a new application
+            ResetProgrammes();
+
+            ToggleFields(true);
+
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error adding new application: {ex.Message}", true);
+        }
+    }
+    
+    private void ResetProgrammes()
+    {
+        foreach (var programme in programmes)
+        {
+            programme.Applied = false;
+            programme.Narration = null;
+            programme.ApplicationID = null;
+            programme.AppProgrammeID = null;
+            programme.CreatedOn = null;
+            programme.CreatedBy = null;
+            programme.ModifiedOn = null;
+            programme.ModifiedBy = null;
+        }
+    }
+
+    private void EditApplication()
+    {
+        ToggleFields(true);
+    }
+
+    private bool ValidateApplication()
+    {
+        if (application.ApplicantID == null || application.ApplicantID == 0)
+        {
+            GlobalErrorHandler.ShowMessage("Applicant ID is required.", true);
+            return false;
+        }
+
+        if (application.ApplicationDate == null || application.ApplicationDate > DateTime.Now)
+        {
+            GlobalErrorHandler.ShowMessage("Application Date is required and cannot be a future date.", true);
+            return false;
+        }
+
+        if (!programmes.Any(p => p.Applied))
+        {
+            GlobalErrorHandler.ShowMessage("At least one programme must be applied.", true);
+            return false;
+        }
+
+        foreach (var programme in programmes.Where(p => p.Applied))
+        {
+            if (string.IsNullOrWhiteSpace(programme.Narration))
+            {
+                GlobalErrorHandler.ShowMessage("Narration is required for applied programmes.", true);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task SaveApplication()
+    {
+        try
+        {
+            isSaving = true;
+            application.CreatedBy = UserId;
+            application.ModifiedBy = UserId;
+            application.ModifiedOn = DateTime.Now;
+
+            if (!ValidateApplication())
+            {
+                return;
+            }
+            //Update the application with the applied programmes
+            application.Programmes = GetAppliedProgrammesAsJson();
+
+            await DbContext.AddEditApplicationAsync(application);
+            ToggleFields(false);
+            await LoadApplicationsAsync(currentPage);
+            GlobalErrorHandler.ShowMessage($"Application saved successfully", false);
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error saving application: {ex.Message}", true);
+            return;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ApplicationApproval(string Status)
+    {
+        try
+        {
+            application.CreatedBy = UserId;
+            application.Status = Status;
+            application.ModifiedOn = DateTime.Now;
+
+            await DbContext.ApplicationApprovalAsync(application);
+            
+            await LoadApplicationsAsync(currentPage);
+            GlobalErrorHandler.ShowMessage($"Application {Status} successfully", false);
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error application approval: {ex.Message}", true);
+            return;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+    
+    private void CancelEdit()
+    {
+        ToggleFields(false);
+    }
+
+    private void ToggleFields(bool enable)
+    {
+        isEditing = enable;
+    }
+
+    private async Task OnApplicantIdChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var applicantId))
+        {
+            if (applicantId == 0)
+                return;
+            await OnApplicantSelected(applicantId);
+        }
+    }
+
+    private async Task OnApplicationIdChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var applicationId))
+        {
+            if (applicationId == 0)
+                return;
+            await OnApplicationSelected(applicationId);
+        }
+    }
+
+    private async Task LoadApplicationsAsync(int page = 1)
+    {
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<Data.SocialFundDbContext>();
+            currentPage = page;
+
+            // Get only the current page
+            var results = await db.GetApplicationAsync(null, null, page, pageSize);
+            applications = results.Select(a => new Application
+            {
+                ApplicationID = a.ApplicationID,
+                ApplicantID = a.ApplicantID,
+                FullName = a.FullName,
+                IDNumber = a.IDNumber,
+                Email = a.Email,
+                ContactNumber = a.ContactNumber, 
+                ApplicationDate = a.ApplicationDate,
+                Status = a.Status,
+                ApprovedBy = a.ApprovedBy,
+                CreatedOn = a.CreatedOn,
+                CreatedBy = a.CreatedBy,
+                ModifiedOn = a.ModifiedOn,
+                ModifiedBy = a.ModifiedBy,
+                Programmes = a.Programmes,
+                TotalCount = a.TotalCount
+            }).ToList();
+            totalApplicants = results.FirstOrDefault()?.TotalCount ?? 0;
+            totalPages = (int)Math.Ceiling(totalApplicants / (double)pageSize);
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error loading applications: {ex.Message}", true);
+        }
+    }
+
+    private void LoadApplicationDetails(Application a)
+    {
+        application = new Application
+        {
+            ApplicationID = a.ApplicationID,
+            ApplicantID = a.ApplicantID,
+            FullName = a.FullName,
+            IDNumber = a.IDNumber,
+            Email = a.Email,
+            ContactNumber = a.ContactNumber, 
+            ApplicationDate = a.ApplicationDate,
+            Status = a.Status,
+            ApprovedBy = a.ApprovedBy,
+            CreatedOn = a.CreatedOn,
+            CreatedBy = a.CreatedBy,
+            ModifiedOn = a.ModifiedOn,
+            ModifiedBy = a.ModifiedBy,
+            Programmes = a.Programmes,
+            TotalCount = a.TotalCount
+        };
+        // Load the programmes for the selected application
+        if (!string.IsNullOrEmpty(a.Programmes))
+        {
+            UpdateProgrammesFromJson(a.Programmes);
+        }
+        ToggleFields(false); // Disable fields after loading details
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > totalPages) return;
+        await LoadApplicationsAsync(page);
+    }
+
+    private string GetAppliedProgrammesAsJson()
+    {
+        var appliedProgrammes = programmes.Where(p => p.Applied).ToList();
+        return System.Text.Json.JsonSerializer.Serialize(appliedProgrammes);
+    }
+
+    private void UpdateProgrammesFromJson(string json)
+    {
+        try
+        {
+            ResetProgrammes(); // Reset the programmes before updating
+            // Deserialize the JSON string into a list of AppProgramme objects  
+            var updatedProgrammes = System.Text.Json.JsonSerializer.Deserialize<List<AppProgramme>>(json);
+            if (updatedProgrammes != null)
+            {
+                foreach (var updatedProgramme in updatedProgrammes)
+                {
+                    var existingProgramme = programmes.FirstOrDefault(p => p.ProgrammeID == updatedProgramme.ProgrammeID);
+                    if (existingProgramme != null)
+                    {
+                        existingProgramme.Applied = true;
+                        existingProgramme.Narration = updatedProgramme.Narration;
+                        existingProgramme.ApplicationID = updatedProgramme.ApplicationID;
+                        existingProgramme.AppProgrammeID = updatedProgramme.AppProgrammeID;
+                        existingProgramme.CreatedOn = updatedProgramme.CreatedOn;
+                    }
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            Console.WriteLine($"JSON Deserialization Error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Unexpected Error: {ex.Message}");
+        }
+    }
+
+    private async Task PromptUser(string action)
+    {
+        if (!ValidateApplication())
+        {
+            return;
+        }
+        actionRequested = action;
+        if (confirmDialog != null)
+        {
+            confirmDialog.Message = $"Are you sure you want to {action.ToLower()} this application?";
+            await confirmDialog.ShowAsync();
+        }
+    }
+
+    private async Task HandleConfirmation(bool confirmed)
+    {
+        if (confirmed && !string.IsNullOrEmpty(actionRequested))
+        {
+            if (actionRequested == "Approve")
+            {
+                // Call your approval logic here
+                await ApplicationApproval("Approved");
+            }
+            else if (actionRequested == "Reject")
+            {
+                // Call your rejection logic here
+                await ApplicationApproval("Rejected");
+            }
+        }
+
+        actionRequested = null; // reset
+    }
+}

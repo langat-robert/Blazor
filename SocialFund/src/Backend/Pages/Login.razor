@@ -1,0 +1,115 @@
+@page "/"
+@using System.Data.SqlClient
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserSessionService UserSessionService
+
+<div class="login-container">
+    <div class="login-box">
+        <h3>Login</h3>
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label for="username">Username</label>
+                <InputText id="username" class="form-control" @bind-Value="loginModel.Username" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <InputText id="password" class="form-control" @bind-Value="loginModel.Password" type="password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Login</button>
+        </EditForm>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+    </div>
+</div>
+
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f8f9fa;
+    }
+
+    .login-box {
+        width: 300px;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+</style>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            var connectionString = Configuration.GetConnectionString("DefaultConnection");
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("GetUserByUsername", connection);
+            command.CommandType = System.Data.CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@Username", loginModel.Username);
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (reader.Read())
+            {
+                var storedPassword = reader["PassKey"].ToString();
+
+                if (storedPassword == loginModel.Password) // Replace with encryption later
+                {
+                    errorMessage = null;
+                    Console.WriteLine("Login successful");
+
+                    // Store UserID in UserSessionService
+                    var userId = reader["UserID"].ToString();
+                    UserSessionService.SetUserID(userId);
+
+                    if (AuthenticationStateProvider is CustomAuthenticationStateProvider customAuthProvider)
+                    {
+                        customAuthProvider.MarkUserAsAuthenticated(loginModel.Username);
+                        Navigation.NavigateTo("/home");
+                    }
+                }
+                else
+                {
+                    errorMessage = "Invalid password.";
+                }
+            }
+            else
+            {
+                errorMessage = "User not found or inactive.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}

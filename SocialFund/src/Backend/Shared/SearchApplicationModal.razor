@@ -1,0 +1,178 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Backend.Data
+@using Backend.Shared
+@inject IServiceScopeFactory ScopeFactory
+@inject Backend.Data.SocialFundDbContext DbContext
+
+@if (IsASOpen)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Search Applications</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="searchModel" OnValidSubmit="OnSearch">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label>Application ID</label>
+                                <Input type="number" class="form-control" @bind-Value="searchModel.ApplicationID" @bind-Value:event="oninput"/>
+                            </div>
+                             <div class="col-md-4">
+                                <label>Applicant ID</label>
+                                <Input type="number" class="form-control" @bind-Value="@searchModel.ApplicantID" @bind-Value:event="oninput"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>First Name</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.FirstName"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Middle Name</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.MiddleName"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Last Name</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.LastName"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>ID Number</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.IDNumber"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Contact Number</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.ContactNumber"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Email</label>
+                                <InputText class="form-control" @bind-Value="@searchModel.Email"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Sex</label>
+                                <select class="form-control" @bind="searchModel.SexID">
+                                    <option value="">Select Sex</option>
+                                    @foreach (var sex in sexDropdown2)
+                                    {
+                                        <option value="@sex.SexID">@sex.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Marital Status</label>
+                                <select class="form-control" @bind="searchModel.MaritalStatusID">
+                                    <option value="">Select Marital Status</option>
+                                    @foreach (var status2 in maritalDropdown2)
+                                    {
+                                        <option value="@status2.MaritalStatusID">@status2.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <Address addressIDs="@AddressIds"/>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary mt-3" @onclick="OnSearch">Search</button>
+                    </EditForm>
+                    <table class="table table-striped mt-3">
+                        <thead>
+                            <tr>
+                                <th>Application ID</th>
+                                <th>Applicant ID</th>
+                                <th>First Name</th>
+                                <th>Last Name</th>
+                                <th>ID Number</th>
+                                <th>Contact Number</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var application in results)
+                            {
+                                <tr @ondblclick="() => SelectApplication(application.ApplicationID)">
+                                    <td>@application.ApplicationID</td>
+                                    <td>@application.ApplicantID</td>
+                                    <td>@application.FirstName</td>
+                                    <td>@application.LastName</td>
+                                    <td>@application.IDNumber</td>
+                                    <td>@application.ContactNumber</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage - 1)" disabled="@((currentPage == 1))">Previous</button>
+                        <span>Page @currentPage of @totalPages</span>
+                        <button class="btn btn-secondary" @onclick="() => GoToPage(currentPage + 1)" disabled="@((currentPage == totalPages))">Next</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@code {
+    [Parameter] public bool IsASOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsASOpenChanged { get; set; }
+    [Parameter] public EventCallback<int> OnApplicationSelected { get; set; }
+
+    private searchApplication searchModel = new();
+    private List<searchApplication> results = new();
+
+    private List<Sex> sexDropdown2 = new();
+    private List<MaritalStatus> maritalDropdown2 = new();
+    private AddressIDs AddressIds = new();
+
+    private int currentPage = 1;
+    private int pageSize = 2;
+    private int totalPages = 5;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Data.SocialFundDbContext>();
+
+        var sLookups = await db.GetLookupAsync("Sex,Marital");
+        sexDropdown2 = sLookups
+            .Where(l => l.LookupGroupCode == "Sex")
+            .Select(l => new Sex { SexID = l.LookupID, Name = l.LookupName })
+            .ToList();
+
+        maritalDropdown2 = sLookups
+            .Where(l => l.LookupGroupCode == "Marital")
+            .Select(l => new MaritalStatus { MaritalStatusID = l.LookupID, Name = l.LookupName })
+            .ToList();
+    }
+
+    private async Task OnSearch()
+    {
+        results = await DbContext.SearchApplicationAsync(searchModel);
+        var totalApplicants = results.FirstOrDefault()?.TotalCount ?? 0;
+        totalPages = (int)Math.Ceiling(totalApplicants / (double)pageSize);
+    }
+
+    private async Task SelectApplication(int? applicationId = null)
+    {
+        if (applicationId == null)
+        {
+            return;
+        }
+
+        await OnApplicationSelected.InvokeAsync(applicationId.Value);
+        await IsASOpenChanged.InvokeAsync(false);
+    }
+
+    private void CloseModal()
+    {
+        IsASOpenChanged.InvokeAsync(false);
+    }
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        await OnSearch();
+    } 
+}

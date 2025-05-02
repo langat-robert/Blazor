@@ -1,0 +1,331 @@
+@page "/address"
+@using Backend.Data
+@using Microsoft.EntityFrameworkCore
+
+
+@* <h6>Address</h6> *@
+
+@if (isLoading)
+{
+    <p>Loading addresses, please wait...</p>
+}
+else
+{ 
+    <div class="form-group">
+        <label for="county">County</label>
+        <select id="county" class="form-control" @onchange="OnCountyChange" disabled="@(!IsEditing)">
+            <option value="">Select County</option>
+            @foreach (var county in Counties)
+            {
+                <option value="@county.CountyID" selected="@(SelectedCountyId == county.CountyID)">@county.CountyName</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="subCounty">Sub County</label>
+        <select id="subCounty" class="form-control" @onchange="OnSubCountyChange" disabled="@(!IsEditing)">
+            <option value="">Select Sub County</option>
+            @foreach (var subCounty in SubCounties)
+            {
+                <option value="@subCounty.SubCountyID" selected="@(SelectedSubCountyId == subCounty.SubCountyID)">@subCounty.SubCountyName</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="location">Location</label>
+        <select id="location" class="form-control" @onchange="OnLocationChange" disabled="@(!IsEditing)">
+            <option value="">Select Location</option>
+            @foreach (var location in Locations)
+            {
+                <option value="@location.LocationID" selected="@(SelectedLocationId == location.LocationID)">@location.LocationName</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="subLocation">Sub Location</label>
+        <select id="subLocation" class="form-control" @onchange="OnSubLocationChange" disabled="@(!IsEditing)">
+            <option value="">Select Sub Location</option>
+            @foreach (var subLocation in SubLocations)
+            {
+                <option value="@subLocation.SubLocationID" selected="@(SelectedSubLocationId == subLocation.SubLocationID)">@subLocation.SubLocationName</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="village">Village</label>
+        <select id="village" class="form-control" @onchange="OnVillageChange" disabled="@(!IsEditing)">
+            <option value="">Select Village</option>
+            @foreach (var village in Villages)
+            {
+                <option value="@village.VillageID" selected="@(SelectedVillageId == village.VillageID)">@village.VillageName</option>
+            }
+        </select>
+    </div>
+}
+@code {
+     private bool isLoading = true;
+    [Parameter] public EventCallback<int> OnVillageSelected { get; set; }
+    [Parameter] public int? SelectedCountyId { get; set; }
+    [Parameter] public int? SelectedSubCountyId { get; set; }
+    [Parameter] public int? SelectedLocationId { get; set; }
+    [Parameter] public int? SelectedSubLocationId { get; set; }
+    [Parameter] public int? SelectedVillageId { get; set; }
+
+    [Parameter]
+    public bool IsEditing { get; set; } = true; // Default to true for editing mode
+
+    [Parameter]
+    public AddressIDs addressIDs { get; set; } = new(); // receives data from parent
+    private List<County> Counties = new();
+    private List<SubCounty> SubCounties = new();
+    private List<Location> Locations = new();
+    private List<SubLocation> SubLocations = new();
+    private List<Village> Villages = new();
+    private List<AddressView> Addresses = new();
+
+    @inject SocialFundDbContext DbContext
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAddressesDataset();
+            PopulateCounties();
+            //await LoadVillage(SelectedVillageId ?? 0); // Load the village if an ID is provided
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions (e.g., log them)
+            Console.WriteLine($"Error loading addresses: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedCountyId.HasValue)
+        {
+            // Load SubCounties based on SelectedCountyId
+        }
+        if (SelectedSubCountyId.HasValue)
+        {
+            // Load Locations based on SelectedSubCountyId
+        }
+        if (SelectedLocationId.HasValue)
+        {
+            // Load SubLocations based on SelectedLocationId
+        }
+        if (SelectedSubLocationId.HasValue)
+        {
+            // Load Villages based on SelectedSubLocationId
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SelectedVillageId.HasValue)
+        {
+            await LoadVillage(SelectedVillageId.Value);
+        }
+    }
+
+    private async Task LoadAddressesDataset()
+    {
+        if (Addresses.Any())
+        {
+            return; // Skip loading if Addresses already has records
+        }
+
+        Addresses = await DbContext.AddressViews.ToListAsync();
+    }
+
+    private void PopulateCounties()
+    {
+        Counties = Addresses
+            .GroupBy(a => new { a.CountyID, a.CountyName })
+            .Select(g => new County
+            {
+                CountyID = g.Key.CountyID,
+                CountyName = g.Key.CountyName
+            })
+            .ToList();
+    }
+
+    public string? CountyName { get; set; } = string.Empty;
+    public string? SubCountyName { get; set; } = string.Empty;
+    public string? LocationName { get; set; } = string.Empty;
+    public string? SubLocationName { get; set; } = string.Empty;
+    public string? VillageName { get; set; } = string.Empty;
+
+    private void OnCountyChange(ChangeEventArgs e)
+    {
+        addressIDs.CountyID = null;
+        addressIDs.SubCountyID = null;
+        addressIDs.LocationID = null;
+        addressIDs.SubLocationID = null;
+        addressIDs.VillageID = null;
+        // Clear dependent dropdowns
+        SubCounties.Clear();
+        Locations.Clear();
+        SubLocations.Clear();       
+        Villages.Clear(); 
+
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out var countyId))
+        {
+            addressIDs.CountyID = countyId;           
+            SubCounties = Addresses
+                .Where(a => a.CountyID == countyId)
+                .GroupBy(a => new { a.SubCountyID, a.SubCountyName })
+                .Select(g => new SubCounty
+                {
+                    SubCountyID = g.Key.SubCountyID,
+                    SubCountyName = g.Key.SubCountyName
+                })
+                .ToList();
+        }
+    }
+
+    private void OnSubCountyChange(ChangeEventArgs e)
+    {
+        addressIDs.SubCountyID = null;
+        addressIDs.LocationID = null;
+        addressIDs.SubLocationID = null;
+        addressIDs.VillageID = null;
+        // Clear dependent dropdowns
+        Locations.Clear();
+        SubLocations.Clear();       
+        Villages.Clear();      
+
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out var subCountyId))
+        {
+            addressIDs.SubCountyID = subCountyId;
+            Locations = Addresses
+                .Where(a => a.SubCountyID == subCountyId)
+                .GroupBy(a => new { a.LocationID, a.LocationName })
+                .Select(g => new Location
+                {
+                    LocationID = g.Key.LocationID,
+                    LocationName = g.Key.LocationName
+                })
+                .ToList();
+        }
+    }
+
+    private void OnLocationChange(ChangeEventArgs e)
+    {
+        addressIDs.LocationID = null;
+        addressIDs.SubLocationID = null;
+        addressIDs.VillageID = null;
+        // Clear dependent dropdowns
+        SubLocations.Clear();
+        Villages.Clear();
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out var locationId))
+        {
+            addressIDs.LocationID = locationId;
+            SubLocations = Addresses
+                .Where(a => a.LocationID == locationId)
+                .GroupBy(a => new { a.SubLocationID, a.SubLocationName })
+                .Select(g => new SubLocation
+                {
+                    SubLocationID = g.Key.SubLocationID,
+                    SubLocationName = g.Key.SubLocationName
+                })
+                .ToList();
+        }
+    }
+
+    private void OnSubLocationChange(ChangeEventArgs e)
+    {
+        addressIDs.SubLocationID = null;
+        addressIDs.VillageID = null;
+        // Clear dependent dropdowns
+        Villages.Clear();
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out var subLocationId))
+        {
+            addressIDs.SubLocationID = subLocationId;
+            Villages = Addresses
+                .Where(a => a.SubLocationID == subLocationId)
+                .GroupBy(a => new { a.VillageID, a.VillageName })
+                .Select(g => new Village
+                {
+                    VillageID = g.Key.VillageID,
+                    VillageName = g.Key.VillageName
+                })
+                .ToList();
+        }
+    }
+
+    private async Task LoadVillage(int villageId)
+    {
+        var record = Addresses.FirstOrDefault(a => a.VillageID == villageId);
+        if (record == null) return;
+
+        addressIDs.VillageID = villageId;
+        // Set and trigger County
+        SelectedCountyId = record.CountyID;
+        await Task.Run(() => OnCountyChange(new ChangeEventArgs { Value = record.CountyID }));
+
+        // Set and trigger SubCounty
+        SelectedSubCountyId = record.SubCountyID;
+        await Task.Run(() => OnSubCountyChange(new ChangeEventArgs { Value = record.SubCountyID }));
+
+        // Set and trigger Location
+        SelectedLocationId = record.LocationID;
+        await Task.Run(() => OnLocationChange(new ChangeEventArgs { Value = record.LocationID }));
+
+        // Set and trigger SubLocation
+        SelectedSubLocationId = record.SubLocationID;
+        await Task.Run(() => OnSubLocationChange(new ChangeEventArgs { Value = record.SubLocationID }));
+
+        // Set Village
+        SelectedVillageId = record.VillageID;
+    }
+
+    private void OnVillageChange(ChangeEventArgs e)
+    {
+        addressIDs.VillageID = null;
+        if (int.TryParse(e.Value?.ToString(), out var villageId))
+        {
+            SelectedVillageId = villageId;
+            addressIDs.VillageID = villageId;
+            OnVillageSelected.InvokeAsync(villageId);
+        }
+    }
+
+    private class County
+    {
+        public int CountyID { get; set; }
+        public string CountyName { get; set; }
+    }
+
+    private class SubCounty
+    {
+        public int SubCountyID { get; set; }
+        public string SubCountyName { get; set; }
+    }
+
+    private class Location
+    {
+        public int LocationID { get; set; }
+        public string LocationName { get; set; }
+    }
+
+    private class SubLocation
+    {
+        public int SubLocationID { get; set; }
+        public string SubLocationName { get; set; }
+    }
+
+    private class Village
+    {
+        public int VillageID { get; set; }
+        public string VillageName { get; set; }
+    }
+}

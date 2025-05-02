@@ -1,0 +1,14 @@
+<div class="form-layout">
+    <div class="row">
+        @ChildContent
+    </div>
+</div>
+
+<style>
+    /* Moved to FormLayout.razor.css */
+</style>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

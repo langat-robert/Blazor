@@ -1,0 +1,17 @@
+﻿@page "/home"
+@attribute [Authorize]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<AuthorizeView>
+    <Authorized>
+        <div class="alert alert-success">
+            👋 Welcome, @context.User.Identity?.Name!
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning">
+            You are not logged in.
+        </div>
+    </NotAuthorized>
+</AuthorizeView>

@@ -1,0 +1,368 @@
+@page "/configurable-parameters"
+@using System.Data.SqlClient
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Configuration
+
+@inject IConfiguration Configuration
+@inject UserSessionService UserSessionService
+
+<h3>Configurable Parameters</h3>
+
+<EditForm Model="this">
+    @if (lookupGroups.Any())
+    {
+        <select id="lookupGroupDropdown" name="lookupGroupDropdown" class="form-control mt-2" @onchange="OnLookupGroupSelected">
+            <option value="" disabled selected>Select a Lookup Group</option>
+            @foreach (var group in lookupGroups)
+            {
+                <option value="@group.LookupGroupID">@group.LookupGroupName</option>
+            }
+        </select>
+    }
+
+    <table id="lookupsTable" name="lookupsTable" class="table mt-4">
+        <thead>
+            <tr>
+                <th>Lookup Code</th>
+                <th>Lookup Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!lookups.Any())
+            {
+                <tr>
+                    <td colspan="3" class="text-center">No records to display</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var lookup in lookups)
+                {
+                    <tr>
+                        <td>@lookup.LookupCode</td>
+                        <td>@lookup.LookupName</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" @onclick="() => ShowEditLookupModal(lookup)">Edit</button>
+                            @* <button class="btn btn-sm btn-danger" @onclick="() => DisableLookup(lookup)">Disable</button> *@
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    <button id="addLookupButton" name="addLookupButton" class="btn btn-primary mt-2" @onclick="ShowAddLookupModal" disabled="@(!IsLookupGroupSelected)">Add Lookup</button>
+</EditForm>
+
+@if (isAddLookupModalVisible)
+{
+    <div class="modal show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Lookup to @selectedLookupGroupName</h5>
+                    <button type="button" class="close" @onclick="CloseAddLookupModal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="newLookup" OnValidSubmit="AddLookup">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="form-group">
+                            <label for="lookupCode">Lookup Code</label>
+                            <InputText id="lookupCode" class="form-control" @bind-Value="newLookup.LookupCode" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lookupName">Lookup Name</label>
+                            <InputText id="lookupName" class="form-control" @bind-Value="newLookup.LookupName" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (isEditLookupModalVisible)
+{
+    <div class="modal show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Lookup in @selectedLookupGroupName</h5>
+                    <button type="button" class="close" @onclick="CloseEditLookupModal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="editLookup" OnValidSubmit="EditLookup">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="form-group">
+                            <label for="editLookupCode">Lookup Code</label>
+                            <InputText id="editLookupCode" class="form-control" @bind-Value="editLookup.LookupCode" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editLookupName">Lookup Name</label>
+                            <InputText id="editLookupName" class="form-control" @bind-Value="editLookup.LookupName" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string selectedLookupGroupName = string.Empty;
+    private List<LookupGroup> lookupGroups = new();
+    private List<Lookup> lookups = new();
+    private bool isAddLookupModalVisible = false;
+    private bool isEditLookupModalVisible = false;
+    private Lookup newLookup = new Lookup();
+    private Lookup editLookup = new Lookup();
+    private string? selectedGroupId;
+
+    private bool IsLookupGroupSelected => !string.IsNullOrEmpty(selectedGroupId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchLookupGroup();
+    }
+
+    private async Task SearchLookupGroup()
+    {
+        try
+        {
+            var connectionString = Configuration.GetConnectionString("DefaultConnection");
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("sp_GetLookupGroup", connection);
+            command.CommandType = System.Data.CommandType.StoredProcedure;
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (!reader.HasRows)
+            {
+                Console.WriteLine("No records returned by sp_GetLookupGroup.");
+                return;
+            }
+
+            lookupGroups.Clear();
+            int recordCount = 0; // Initialize record count
+            while (reader.Read())
+            {
+                recordCount++; // Increment record count
+                lookupGroups.Add(new LookupGroup
+                {
+                    LookupGroupID = reader["LookupGroupID"].ToString(),
+                    LookupGroupName = reader["LookupGroupName"].ToString()
+                });
+            }
+            Console.WriteLine($"Record count: {recordCount}"); // Debug line to print record count
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching lookup groups: {ex.Message}");
+        }
+    }
+
+    private async Task OnLookupGroupSelected(ChangeEventArgs e)
+    {
+        selectedGroupId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(selectedGroupId))
+        {
+            Console.WriteLine("No Lookup Group selected.");
+            return;
+        }
+
+        selectedLookupGroupName = lookupGroups.FirstOrDefault(g => g.LookupGroupID == selectedGroupId)?.LookupGroupName ?? string.Empty;
+
+        try
+        {
+            var connectionString = Configuration.GetConnectionString("DefaultConnection");
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("sp_GetLookup", connection);
+            command.CommandType = System.Data.CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@LookupGroupID", selectedGroupId);
+            command.Parameters.AddWithValue("@PageNumber", 1);
+            command.Parameters.AddWithValue("@PageSize", 10);
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (!reader.HasRows)
+            {
+                Console.WriteLine("No lookups found for the selected group.");
+                lookups.Clear();
+                return;
+            }
+
+            lookups.Clear();
+            while (reader.Read())
+            {
+                lookups.Add(new Lookup
+                {
+                    LookupID = reader["LookupID"].ToString(), // Ensure LookupID is added
+                    LookupCode = reader["LookupCode"].ToString(),
+                    LookupName = reader["LookupName"].ToString()
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching lookups: {ex.Message}");
+        }
+    }
+
+    private void ShowAddLookupModal()
+    {
+        if (!IsLookupGroupSelected)
+        {
+            GlobalErrorHandler.ShowMessage("Please select a Lookup Group before adding a Lookup.",true);
+            return;
+        }
+
+        isAddLookupModalVisible = true;
+    }
+
+    private void CloseAddLookupModal()
+    {
+        isAddLookupModalVisible = false;
+        newLookup = new Lookup();
+    }
+
+    private async Task AddLookup()
+    {
+        if (string.IsNullOrEmpty(selectedGroupId))
+        {
+            GlobalErrorHandler.ShowMessage("No Lookup Group selected.");
+            return;
+        }
+
+        try
+        {
+            var userId = UserSessionService.GetUserID(); // Retrieve UserID from UserSessionService
+            if (string.IsNullOrEmpty(userId))
+            {
+                GlobalErrorHandler.ShowMessage("UserID is not set.",true);
+                return;
+            }
+
+            var connectionString = Configuration.GetConnectionString("DefaultConnection");
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("sp_AddEditLookup", connection);
+            command.CommandType = System.Data.CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@LookupGroupID", selectedGroupId);
+            command.Parameters.AddWithValue("@LookupCode", newLookup.LookupCode);
+            command.Parameters.AddWithValue("@LookupName", newLookup.LookupName);
+            command.Parameters.AddWithValue("@UserID", userId); // Pass UserID to the stored procedure
+
+            await command.ExecuteNonQueryAsync();
+
+            Console.WriteLine("Lookup added successfully.");
+            CloseAddLookupModal();
+            await OnLookupGroupSelected(new ChangeEventArgs { Value = selectedGroupId });
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error adding lookup: {ex.Message}",true);
+        }
+    }
+
+    private void ShowEditLookupModal(Lookup lookup)
+    {
+        if (!IsLookupGroupSelected)
+        {
+            GlobalErrorHandler.ShowMessage("Please select a Lookup Group before editing a Lookup.",true);
+            return;
+        }
+
+        editLookup = new Lookup
+        {
+            LookupID = lookup.LookupID,
+            LookupCode = lookup.LookupCode,
+            LookupName = lookup.LookupName
+        };
+
+        isEditLookupModalVisible = true;
+    }
+
+    private void CloseEditLookupModal()
+    {
+        isEditLookupModalVisible = false;
+        editLookup = new Lookup();
+    }
+
+    private async Task EditLookup()
+    {
+        if (string.IsNullOrEmpty(selectedGroupId))
+        {
+            GlobalErrorHandler.ShowMessage("No Lookup Group selected.",true);
+            return;
+        }
+
+        try
+        {
+            var userId = UserSessionService.GetUserID(); // Retrieve UserID from UserSessionService
+            if (string.IsNullOrEmpty(userId))
+            {
+                GlobalErrorHandler.ShowMessage("UserID is not set.",true);
+                return;
+            }
+
+            var connectionString = Configuration.GetConnectionString("DefaultConnection");
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+
+            using var command = new SqlCommand("sp_AddEditLookup", connection);
+            command.CommandType = System.Data.CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@LookupGroupID", selectedGroupId);
+            command.Parameters.AddWithValue("@LookupCode", editLookup.LookupCode);
+            command.Parameters.AddWithValue("@LookupName", editLookup.LookupName);
+            command.Parameters.AddWithValue("@UserID", userId); // Pass UserID to the stored procedure
+            command.Parameters.AddWithValue("@LookupID", editLookup.LookupID); // Pass LookupID to the stored procedure
+
+            await command.ExecuteNonQueryAsync();
+
+            Console.WriteLine("Lookup edited successfully.");
+            CloseEditLookupModal();
+            await OnLookupGroupSelected(new ChangeEventArgs { Value = selectedGroupId });
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error editing lookup: {ex.Message}",true);
+        }
+    }
+
+    private void DisableLookup(Lookup lookup)
+    {
+        // Logic to disable a lookup
+    }
+
+    private class LookupGroup
+    {
+        public string LookupGroupID { get; set; } = string.Empty;
+        public string LookupGroupName { get; set; } = string.Empty;
+    }
+
+    private class Lookup
+    {
+        public string LookupID { get; set; } = string.Empty;
+        public string LookupCode { get; set; } = string.Empty;
+        public string LookupName { get; set; } = string.Empty;
+    }
+}
