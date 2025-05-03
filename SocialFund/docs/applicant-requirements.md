@@ -1,12 +1,62 @@
-1. Use Existing file Applicants.razor for the requirements below. Table schema is in the schema.sql file and its named Applicants, align the DBContext classes accordingly using SocialFundDbContext.cs for database access logic.
-2. Create an interface to maintain records in Applicants tables using Applicants.razor for front end. the following are setting per field on the interface
-3. use a flexible layout that will arrange controls in two/three columns if screen is enough and one column for smaller screen 
-4. Create select control for dropdown options named sexDropdown to be used to display option matching SexID and maritalDropdown to be used to display option matching MaritalStatusID,
-5. Reference Address.razor to be used in part of the form.
-6. Lets arrange the diplay controls as follows  ApplicantID, FirstName, MiddleName, LastName,IDNumber, ContactNumber, Email, sexDropdown, maritalDropdown, Address.razor, CreatedOn, CreatedBy, ModifiedOn, ModifiedBy.
-7. Create a common method the will be used to populate the sexDropdown and maritalDropdown when the form loads. To populate sexDropdown use stored prodedure sp_GetLookup with @LookupGroupID=1. To populate maritalDropdown use stored prodedure sp_GetLookup with @LookupGroupID=2. 
-8. Implement the add/edit functionality use stored procedure named sp_AddEditApplicant, shared in SPs.sql file. the database logic is already implemented. 
-9. Create a common method called GetApplicant we will use to retrieve records and display on the form, it should take four optional parameters i.e. ApplicantID,IDNumber, PageNumber, PageSize. Then calls the stored procedure sp_GetApplicants and pass the parameters to get record from database , and display on the form
-10. Create a search functionality as follows: should be a modal form with search fields as ApplicantID, FirstName, MiddleName, LastName,IDNumber, ContactNumber, Email, sexDropdown, maritalDropdown, Address.razor; Should have a table below the search fields showing the results once a search button is clicked; call a stored procedure named sp_searchApplicant, and pass all the search fields to it; Once you double click on the specific record on the search result it should return the ApplicantID value to the calling function.
-11. ApplicantID: input field,one can type in the ID and press enter and system calls the GetApplicant method to display records. Put a search functionality, a small icon at right of the field that when its clicked it call the search functionality in previous step 
-12. Create a Table below the save button to show recent saved 2 records created/edit by the loggedin user , use same stored procedure sp_GetApplicants to retrieve records. After a record is saved it should display on the table
+# Applicant Form Requirements
+
+This document outlines the requirements for the `Applicants.razor` form.
+
+## Overview
+
+- Use the existing `Applicants.razor` file for implementing the requirements.
+- The database table schema is defined in `schema.sql` under the name `Applicants`.
+- Align the `DbContext` classes in `SocialFundDbContext.cs` for database access logic.
+
+## Interface Design
+
+1. **Flexible Layout**:
+   - Arrange controls in two/three columns for larger screens and one column for smaller screens.
+
+2. **Dropdown Controls**:
+   - Create a dropdown named `sexDropdown` to display options matching `SexID`.
+   - Create a dropdown named `maritalDropdown` to display options matching `MaritalStatusID`.
+
+3. **Address Integration**:
+   - Reference `Address.razor` as part of the form.
+
+4. **Control Arrangement**:
+   - Arrange the display controls in the following order:
+     - `ApplicantID`, `FirstName`, `MiddleName`, `LastName`, `IDNumber`, `ContactNumber`, `Email`, `sexDropdown`, `maritalDropdown`, `Address.razor`, `CreatedOn`, `CreatedBy`, `ModifiedOn`, `ModifiedBy`.
+
+## Common Methods
+
+1. **Dropdown Population**:
+   - Create a common method to populate `sexDropdown` and `maritalDropdown` when the form loads.
+   - Use the stored procedure `sp_GetLookup` with the following parameters:
+     - `@LookupGroupID=1` for `sexDropdown`.
+     - `@LookupGroupID=2` for `maritalDropdown`.
+
+2. **Add/Edit Functionality**:
+   - Implement add/edit functionality using the stored procedure `sp_AddEditApplicant`.
+
+3. **Retrieve Records**:
+   - Create a common method `GetApplicant` to retrieve records and display them on the form.
+   - The method should accept the following optional parameters:
+     - `ApplicantID`, `IDNumber`, `PageNumber`, `PageSize`.
+   - Call the stored procedure `sp_GetApplicants` and pass the parameters to fetch records.
+
+## Search Functionality
+
+1. **Search Modal**:
+   - Create a modal form with the following search fields:
+     - `ApplicantID`, `FirstName`, `MiddleName`, `LastName`, `IDNumber`, `ContactNumber`, `Email`, `sexDropdown`, `maritalDropdown`, `Address.razor`.
+   - Add a table below the search fields to display results when the search button is clicked.
+   - Call the stored procedure `sp_searchApplicant` and pass all search fields as parameters.
+   - On double-clicking a record in the search results, return the `ApplicantID` value to the calling function.
+
+2. **ApplicantID Field**:
+   - Add an input field for `ApplicantID`.
+   - Allow users to type the ID and press Enter to call the `GetApplicant` method and display records.
+   - Add a search icon to the right of the field to trigger the search functionality.
+
+## Recent Records Table
+
+- Add a table below the save button to display the two most recently saved records created/edited by the logged-in user.
+- Use the stored procedure `sp_GetApplicants` to fetch records.
+- Ensure the table updates to display the saved record immediately after a save operation.

@@ -94,4 +94,13 @@ npm start
 - Ensure your SQL Server instance is running before starting the application.
 - If you encounter any issues, check the logs or console output for error messages.
 - For further details, refer to the documentation files in the `docs/` folder.
+- Other documents are below:
+  - `social-assistance-fund-system.md`
+  - `address-requirements.md`
+  - `applicant-requirements.md`
+  - `application-form.md`
+  - `applications-requirements.md`
+  - `config-parameters.md`
+  - `Initialize-database.md`
+  
 - Defualt Login for the test is UserName: R, pwd: 1. Encryptions currently ommited.
