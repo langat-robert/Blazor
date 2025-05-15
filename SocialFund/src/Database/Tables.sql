@@ -1,3 +1,18 @@
+-- Create the Applications table
+IF OBJECT_ID('Users') IS NULL
+CREATE TABLE Users (
+    UserID		INT IDENTITY(1,1) PRIMARY KEY,
+    UserName	NVARCHAR(50) NOT NULL,
+	PassKey		NVARCHAR(50) NOT NULL,
+    CreatedOn	DATETIME NOT NULL DEFAULT GETDATE(),
+    IsActive	BIT NOT NULL DEFAULT 0
+);
+
+/*
+Insert Into Users(UserName,PassKey,IsActive)
+VALUES('R','1',1);
+GO
+*/
 
 -- Create change log table for audit purpose
 IF OBJECT_ID('ChangeLog') is null
@@ -50,22 +65,6 @@ Insert Into Lookups(LookupGroupID,LookupCode,LookupName,CreatedBy)
 Values(1,'M','Male',1),
 	(1,'F','Female',1),
 	(2,'S','Single',1)
-*/
-
--- Create the Applications table
-IF OBJECT_ID('Users') IS NULL
-CREATE TABLE Users (
-    UserID		INT IDENTITY(1,1) PRIMARY KEY,
-    UserName	NVARCHAR(50) NOT NULL,
-	PassKey		NVARCHAR(50) NOT NULL,
-    CreatedOn	DATETIME NOT NULL DEFAULT GETDATE(),
-    IsActive	BIT NOT NULL DEFAULT 0
-);
-
-/*
-Insert Into Users(UserName,PassKey,IsActive)
-VALUES('R','1',1);
-GO
 */
 
 -- Create the County table

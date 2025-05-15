@@ -5,6 +5,26 @@
     Layout = "_Layout";
 }
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+    function printForm(containerId) {
+        const element = document.getElementById(containerId);
+        if (!element) {
+            console.error('Element not found:', containerId);
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Print</title></head><body>');
+        printWindow.document.write(element.outerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+</script>
+
 <CascadingAuthenticationState>
     <app>
         <component type="typeof(App)" render-mode="ServerPrerendered" />

@@ -1,0 +1,228 @@
+@page "/application-form"
+@inject IJSRuntime JS
+
+
+<div id="form-container" class="container p-4 border rounded bg-white">
+ <div class="row">
+    <div class="col-12 text-center mb-4">
+        <img src="https://localhost:7014/images/logo.png" alt="Logo" style="height:80px;"/>
+    </div>
+
+    <div class="col-12 text-center mb-3">
+        <h5>APPLICATION FOR SOCIAL ASSISTANCE</h5>
+    </div>
+
+    <div class="col-12 text-start mb-3" id="toAdministrator">
+        <p class="mb-0"><strong>To,</strong></p>
+        <p class="mb-0"><strong>The Administrator,</strong></p>
+        <p class="mb-0"><strong>Social Assistance Fund</strong></p>
+    </div>
+
+    <div class="col-12 ms-4 text-start mb-3" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+            <p><strong>1. Applicant's Details</strong></p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("a) Application Date (dd/mm/yyyy)")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("b) Full Name")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("c) Sex")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("d) Age")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("e) Marital Status")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("f) Identity Card/Passport Number")</p>
+        </div>
+        
+         <div>
+            <p style="font-family: monospace;">@GenLabel("g) County")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("h) Sub-County")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("i) Location")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("j) Sub-Location")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("k) Village")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("l) Postal Address")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("m) Physical Address")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("n) Telephone Contacts")</p>
+        </div>
+
+        <div>
+            <p><strong>2. Social Assistance Programme applied for:</strong></p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("a) Orphans and Vulnerable children")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("b) Poor elderly Persons")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("c) Persons with disability")</p>
+        </div>
+        
+        <div>
+            <p style="font-family: monospace;">@GenLabel("d) Persons in extreme poverty")</p>
+        </div>
+
+        <div>
+            <p style="font-family: monospace;">@GenLabel("e) Any Other")</p>
+        </div>
+    </div>
+
+    <div>
+        <p><strong>I hereby declare that the information provided in this application is true to the best of my knowledge. </strong></p>
+    </div>
+    <div>
+        <p><strong>@GenLabel("Signature",40)</strong></p>
+        <p><strong>@GenLabel("Date",40)</strong></p>
+    </div>
+    
+    <div>
+        <p><strong>@GenLine("")</strong></p>
+        <p><strong><u>FOR OFFICIAL USE ONLY</u></strong></p>
+        <p>Information collected by </p>
+        <p>@GenLabel("Name",40)</p>
+        <p>@GenLabel("Designation",40)</p>
+        <p>@GenLabel("Signature",40)</p>
+        <p>@GenLabel("Date",40)</p>
+    </div>
+
+@*
+    <div>@DateTime.Now.ToString("dd/MM/yyyy")</div>
+    <div class="form-section mb-3">
+        <label><strong>Full Name:</strong></label>
+        <div>@applicant.FullName</div>
+    </div>
+
+    <div class="signature-section mb-4">
+        <h5>Customer Signature</h5>
+    </div>
+
+    <div class="form-section official-use p-3 border-top mt-4">
+        <h5>For Official Use Only</h5>
+        <p>Comments or approval section goes here.</p>
+    </div>*@
+
+</div>     
+</div>
+<div class="text-center mt-4">
+    <button class="btn btn-primary" @onclick="ExportToPdf">Export to PDF</button>
+    <button class="btn btn-secondary" @onclick="PrintForm">Print</button>
+</div>
+
+<script>
+    async function exportHtmlToPdf(containerId) {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+
+        const element = document.getElementById(containerId);
+        if (!element) {
+            console.error('Element not found:', containerId);
+            return;
+        }
+
+        // Use html2canvas to render the HTML element to a canvas with reduced scale
+        const canvas = await html2canvas(element, { scale: 0.5 }); // Reduce scale for smaller image size
+        const imgData = canvas.toDataURL('image/jpeg', 0.5); // Compress image to JPEG with 50% quality
+
+        // Add the image to the PDF
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+        // Save the PDF
+        pdf.save('application-form.pdf');
+    }
+
+    function printForm(containerId) {
+        const element = document.getElementById(containerId);
+        if (!element) {
+            console.error('Element not found:', containerId);
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Print</title></head><body>');
+        printWindow.document.write(element.outerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+</script>
+
+@code {
+
+    private ApplicantModel applicant = new ApplicantModel
+    {
+        FullName = "John Doe",
+        IDNumber = "12345678",
+        Address = "123 Main Street, Nairobi"
+    };
+
+    private async Task ExportToPdf()
+    {
+        await JS.InvokeVoidAsync("exportHtmlToPdf", "form-container");
+    }
+
+    private async Task PrintForm()
+    {
+        await JS.InvokeVoidAsync("printForm", "form-container");
+    }
+
+    public class ApplicantModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string IDNumber { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+    }
+
+    private string GenLabel(string label, int totalLength = 80)
+    {
+        int labelLength = label.Length;
+        int dotsCount = Math.Max(totalLength - labelLength, 0);
+        return $"{label}{new string('.', dotsCount)}";
+    }
+
+    private string GenLine(string label, int totalLength = 80)
+    {
+        int labelLength = label.Length;
+        int dotsCount = Math.Max(totalLength - labelLength, 0);
+        return $"{label}{new string('_', dotsCount)}";
+    }
+}

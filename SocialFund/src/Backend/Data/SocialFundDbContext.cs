@@ -44,11 +44,13 @@ namespace Backend.Data
             var lookupValues = new List<LookupValue>();
             try
             {
-                using var connection = Database.GetDbConnection();
-                if (connection.State != ConnectionState.Open)
-                    await connection.OpenAsync();
+                myConn ??= Database.GetDbConnection();
+                if (myConn.State != ConnectionState.Open)
+                {
+                    await myConn.OpenAsync();
+                }
 
-                using var command = connection.CreateCommand();
+                using var command = myConn.CreateCommand();
                 command.CommandText = "sp_GetSpecificLookup";
                 command.CommandType = System.Data.CommandType.StoredProcedure;
                 command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter("@Codes", Codes));

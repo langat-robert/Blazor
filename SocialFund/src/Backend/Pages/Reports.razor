@@ -1,8 +1,64 @@
 @page "/reports"
 
-<div class="d-flex justify-content-center align-items-center vh-100">
+@* <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="text-center">
         <h1 class="display-4 text-secondary">🚧 Coming Soon</h1>
         <p class="lead text-muted">This page is under construction. Please check back later.</p>
     </div>
+</div> *@
+
+@inject ReportService ReportService
+@using Stimulsoft.Report
+@using Stimulsoft.Base
+@using Stimulsoft.Report.Blazor
+
+<LoadingOverlay IsVisible="@isLoading" />
+
+@if (!isLoading)
+{
+<div class="container-fluid p-4 border rounded bg-white">
+    <div class="row">
+        <div class="col-12 text-center mb-3">
+            <h5>Reports</h5>
+        </div>
+        <div class="col-12 mb-4">
+            <StiBlazorViewer Report="@Report" Height="800px"  Width="100%"/>
+        </div>
+    </div>
 </div>
+}
+@code {
+    private bool isLoading = true;
+    private StiReport Report;
+
+@* ShowExportToPdf="true"
+ShowExportToExcel="true"
+ShowExportToWord="true"
+ShowPrintButton="true"
+ShowBookmarksPanel="true" *@
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        await InvokeAsync(StateHasChanged); // allow spinner to show
+        await Task.Delay(100); // optional UI yield
+        try
+        {
+            Report = ReportService.CreateDynamicReport("My Report Title", "Robert");
+
+            //Create empty report object
+            //this.Report = new StiReport();
+            //this.Report.Load("./Reports/SampleRpt.mrt");
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions (e.g., log them)
+            Console.WriteLine($"Error Creating Dynamic Report: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

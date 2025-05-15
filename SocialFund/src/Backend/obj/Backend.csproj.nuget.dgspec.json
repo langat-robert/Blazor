@@ -53,9 +53,13 @@
               "target": "Package",
               "version": "[6.0.0, )"
             },
+            "Stimulsoft.Reports.Blazor": {
+              "target": "Package",
+              "version": "[2025.2.3, )"
+            },
             "System.Data.SqlClient": {
               "target": "Package",
-              "version": "[4.8.5, )"
+              "version": "[4.8.6, )"
             }
           },
           "imports": [

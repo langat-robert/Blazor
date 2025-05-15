@@ -3,13 +3,16 @@ using Microsoft.AspNetCore.Components.Web;
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Components.Authorization;
+using Stimulsoft.Base;
+//using Stimulsoft.Report;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddSingleton<WeatherForecastService>();
+//builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddScoped<ReportService>(); // Your report service
 
 // Register IHttpContextAccessor service
 builder.Services.AddHttpContextAccessor();
