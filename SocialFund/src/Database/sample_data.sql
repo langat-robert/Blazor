@@ -76,4 +76,114 @@ VALUES('ORPHANS','Orphans and vulnerable children',1),
 GO
 
 
+IF NOT EXISTS(SELECT * FROM Reports WHERE Name='Applicants')
+INSERT INTO Reports (Name, Description, ReportSP, Filters)
+VALUES 
+(
+    'Applicants',
+    'List of applicants with location filters',
+    'rpt_Applicants',
+	'[
+		{
+			"name": "FromDate",
+			"label": "From Date",
+			"type": "Date",
+			"required": true
+		},
+		{
+			"name": "ToDate",
+			"label": "To Date",
+			"type": "Date",
+			"required": true
+		},
+		{
+			"name": "CountyID",
+			"label": "County",
+			"type": "Dropdown",
+			"dataSourceSP": "spGetCounties",
+			"required": false
+		},
+		{
+			"name": "SubCountyID",
+			"label": "SubCounty",
+			"type": "Dropdown",
+			"dataSourceSP": "spGetSubCountiesByCounty",
+			"dataSourceParameters": [
+				{
+					"name": "CountyId",
+					"sourceFilter": "CountyID"
+				}
+			],
+			"required": false
+		},
+		{
+			"name": "LocationID",
+			"label": "Location",
+			"type": "Dropdown",
+			"dataSourceSP": "spGetLocationsBySubCounty",
+			"dataSourceParameters": [
+				{
+					"name": "SubCountyId",
+					"sourceFilter": "SubCountyID"
+				}
+			],
+			"required": false
+		},
+		{
+			"name": "SubLocationID",
+			"label": "Sub Location",
+			"type": "Dropdown",
+			"dataSourceSP": "spGetSubLocationsByLocation",
+			"dataSourceParameters": [
+				{
+					"name": "LocationId",
+					"sourceFilter": "LocationID"
+				}
+			],
+			"required": false
+		},
+		{
+			"name": "VillageID",
+			"label": "Village",
+			"type": "Dropdown",
+			"dataSourceSP": "spGetVillagesBySubLocation",
+			"dataSourceParameters": [
+				{
+					"name": "SubLocationId",
+					"sourceFilter": "SubLocationID"
+				}
+			],
+			"required": false
+		},
+		{
+			"Name": "SexID",
+			"Label": "Gender",
+			"Type": "Dropdown",
+			"DataSourceSP": "sp_GetSelectOptions",
+			"DataSourceParameters": [
+			  {
+				"Name": "Codes",
+				"StaticValue": "Sex"
+			  }
+			]
+		},
+		{
+			"Name": "MaritalStatusID",
+			"Label": "Marital Status",
+			"Type": "Dropdown",
+			"DataSourceSP": "sp_GetSelectOptions",
+			"DataSourceParameters": [
+			  {
+				"Name": "Codes",
+				"StaticValue": "Marital"
+			  }
+			]
+		  }
+	]'
+
+);
+
+GO
+
+
 

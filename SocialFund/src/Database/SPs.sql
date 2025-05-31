@@ -1,4 +1,23 @@
 
+CREATE OR ALTER PROCEDURE sp_GetSelectOptions
+	@Codes NVARCHAR(1000) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        L.LookupID,
+        L.LookupName
+    FROM Lookups L
+    INNER JOIN LookupGroup G ON L.LookupGroupID = G.LookupGroupID
+    WHERE 
+        G.LookupGroupCode IN (SELECT Value FROM dbo.SplitString(@Codes, ',')
+    )
+    ORDER BY 2
+END;
+
+GO
+
 
 CREATE OR ALTER PROCEDURE spGetVillagesBySubLocation
 (
@@ -129,11 +148,12 @@ END;
 GO
 
 
-CREATE OR ALTER PROCEDURE sp_AddEdiLookupGroup
+CREATE OR ALTER PROCEDURE sp_AddEditLookupGroup
     @LookupGroupID INT = NULL,
     @LookupGroupCode NVARCHAR(10),
     @LookupGroupName NVARCHAR(100),
-    @UserID INT
+    @UserID INT,
+	@Result INT OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -154,7 +174,7 @@ BEGIN
                 @UserID, 
                 GETDATE()
             );
-            RETURN 1;
+            SET @Result = 1;
         END
         ELSE
         BEGIN
@@ -194,11 +214,11 @@ BEGIN
                 ModifiedOn = GETDATE()
             WHERE LookupGroupID = @LookupGroupID;
 
-            RETURN 2;
+            SET @Result = 2;
         END
     END TRY
     BEGIN CATCH
-        RETURN -1;
+        SET @Result = -1;
     END CATCH
 END;
 
@@ -635,8 +655,8 @@ BEGIN
 
     SELECT 
         L.LookupID,
-        L.LookupCode,
-        L.LookupName,
+		L.LookupCode,
+        L.LookupName,		
         L.LookupGroupID,
         G.LookupGroupCode,
         G.LookupGroupName
@@ -1026,3 +1046,37 @@ BEGIN
 END
 
 GO
+
+CREATE OR ALTER PROCEDURE rpt_Applicants
+	@FromDate		Date = NULL,
+	@ToDate			Date = NULL,
+    @SexID			INT = NULL,
+    @MaritalStatusID INT = NULL,
+    @VillageID		INT = NULL,
+    @SubLocationID	INT = NULL,
+    @LocationID		INT = NULL,
+    @SubCountyID	INT = NULL,
+    @CountyID		INT = NULL,
+	@UserID			INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT ApplicantID,FirstName,ISNULL(MiddleName,'') MiddleName,LastName,IDNumber,ContactNumber,Email/*,SexID,MaritalStatusID,VillageID,CreatedOn,CreatedBy,ModifiedOn, ModifiedBy,
+		SubLocationID, LocationID, SubCountyID,CountyID,*/
+    FROM vw_SearchApplicant
+    /*WHERE
+		CAST(CreatedOn AS DATE) BETWEEN @FromDate AND @ToDate AND
+        (@SexID IS NULL OR SexID = @SexID) AND
+        (@MaritalStatusID IS NULL OR MaritalStatusID = @MaritalStatusID) AND
+        (@VillageID IS NULL OR VillageID = @VillageID) AND
+        (@SubLocationID IS NULL OR SubLocationID = @SubLocationID) AND
+        (@LocationID IS NULL OR LocationID = @LocationID) AND
+        (@SubCountyID IS NULL OR SubCountyID = @SubCountyID) AND
+        (@CountyID IS NULL OR CountyID = @CountyID)*/
+	ORDER BY ApplicantID;
+END;
+
+GO
+
+--exec rpt_Applicants @FromDate=N'2025-05-30',@ToDate=N'2025-05-31',@CountyID=N'3',@SubCountyID=N'2',@LocationID=N'7',@SubLocationID=N'4',@VillageID=N'8',@SexID=N'2',@MaritalStatusID=N'4'

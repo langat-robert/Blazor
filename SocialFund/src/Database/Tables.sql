@@ -1,3 +1,15 @@
+-- Create the Reports table
+IF OBJECT_ID('Reports') IS NULL
+CREATE TABLE Reports (
+    ReportId	INT IDENTITY(1,1) PRIMARY KEY,
+    Name		NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(255),
+    ReportSP	NVARCHAR(100) NOT NULL,          -- SP to run for report data
+    Filters		NVARCHAR(MAX),                    -- JSON defining input filters
+    CreatedOn	DATETIME DEFAULT GETDATE(),
+    IsActive	BIT DEFAULT 1
+);
+
 -- Create the Applications table
 IF OBJECT_ID('Users') IS NULL
 CREATE TABLE Users (
