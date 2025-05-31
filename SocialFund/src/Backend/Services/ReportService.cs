@@ -1,16 +1,13 @@
 using Stimulsoft.Report;
 using Stimulsoft.Report.Components;
 using Stimulsoft.Base.Drawing;
-using System.Data;
 using System.Drawing;
-using System.IO;
-using System;
-
-using Stimulsoft.Base;
-using Stimulsoft.Report.Blazor;
+using System.Data;
+using Backend.Data;
 
 public class ReportService
 {
+    private readonly SocialFundDbContext DbContext;
     public StiReport CreateDynamicReport(string reportTitle, string generatedBy)
     {
         // Sample data
@@ -50,12 +47,11 @@ public class ReportService
         double x = (pageWidth - imageWidth) / 2; // Center X position
 
         // Use Base64 string for the logo
-        //var logoBase64 = "<Base64_String_Here>"; // Replace with actual Base64 string
         var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "logo.png");
+        var logoBytes = File.ReadAllBytes(imagePath);
         var logo = new StiImage(new RectangleD(x, 0, imageWidth, imageHeight))
         {
-            //ImageBytes = Convert.FromBase64String(logoBase64),
-            Image = Image.FromFile(imagePath),
+            ImageBytes = logoBytes,
             Stretch = true
         };
         headerBand.Components.Add(logo);
@@ -67,7 +63,6 @@ public class ReportService
         var titleText = new StiText(new RectangleD(titleX, titleTop, titleWidth, 1))
         {
             Text = "{ReportTitle}",
-            HorAlignment = StiTextHorAlignment.Center,
             Font = new Font("Arial", 16, FontStyle.Bold)
         };
         headerBand.Components.Add(titleText);
@@ -81,7 +76,6 @@ public class ReportService
         var subTitle = new StiText(new RectangleD(subTitleX, subTitleTop, subTitleWidth, 0.3))
         {
             Text = subTitleText,
-            HorAlignment = StiTextHorAlignment.Center,
             Font = new Font("Arial", 10, FontStyle.Italic)
         };
         headerBand.Components.Add(subTitle);
@@ -121,7 +115,6 @@ public class ReportService
             {
                 Text = col.ColumnName,
                 HorAlignment = StiTextHorAlignment.Center,
-                VertAlignment = StiVertAlignment.Center,
                 Font = new Font("Arial", 10, FontStyle.Bold),
                 Brush = new StiSolidBrush(Color.LightGray),
                 Border = new StiBorder()
@@ -139,25 +132,191 @@ public class ReportService
             {
                 Text = $"{{MyData.{col.ColumnName}}}",
                 HorAlignment = horAlignment,
-                VertAlignment = StiVertAlignment.Center,
-                Font = new Font("Arial", 10),
+                Font = new Font("Arial", 10, FontStyle.Regular),
                 CanGrow = true,
                 WordWrap = true,
                 Border = new StiBorder()
                 {
-                    //Side = StiBorderSides.All,
                     Side = StiBorderSides.Left | StiBorderSides.Right | StiBorderSides.Bottom,
                     Color = Color.LightGray,
                     Size = 0.3,
                     Style = StiPenStyle.Solid //Dash,Dot
                 }
-                
             };
             dataBand.Components.Add(dataText);
-
             i++;
+        }
+        return report;
+    }
+
+    public StiReport RunReportAsync(UserReport userReport, Dictionary<string, object> parameters, string generatedBy)
+    {
+        var report = new StiReport();
+        try
+        {
+            // Sample data
+            //DataTable data = DbContext.RunReportAsync(userReport.ReportSP, parameters);
+            DataTable data = DbContext.RunReportAsync(userReport.ReportSP, parameters).GetAwaiter().GetResult();
+
+            if (data == null || data.Rows.Count == 0)
+            {
+                return null; // No data to report
+            }
+            // Create report
+            report.Dictionary.Databases.Clear();       // Clears database connections
+            report.Dictionary.DataSources.Clear();     // Clears registered data sources
+            report.Dictionary.Variables.Clear();       // Clears variables (optional)
+            report.Dictionary.BusinessObjects.Clear();
+            data.TableName = "MyData";
+            report.RegData("MyData", data,true);
+           // report.Dictionary.Synchronize();
+
+            string reportTitle = userReport.Name;
+            // Parameters
+            report.Dictionary.Variables.Add("ReportTitle", reportTitle);
+            report.Dictionary.Variables.Add("GeneratedBy", generatedBy);
+            report.Dictionary.Variables.Add("GeneratedDate", DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+
+            // Create page
+            report.Pages.Clear();
+
+            var page = new StiPage(report);
+            page.Name = "Page1";
+            page.Margins = new StiMargins(0.1, 0.1, 0.1, 0.1); // Left, Right, Top, Bottom in centimeters
+            report.Pages.Add(page);
+            double charWidth = 0.25;
+
+            // === Logo/Image ===
+            var headerBand = new StiHeaderBand { Height = 1.5 };
+            page.Components.Add(headerBand);
+
+            double imageWidth = 2;
+            double imageHeight = 1.5;
+            double pageWidth = page.Width - page.Margins.Left - page.Margins.Right; // Width of the report page
+            double x = (pageWidth - imageWidth) / 2; // Center X position
+
+            // Use Base64 string for the logo
+            var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "logo.png");
+            var logoBytes = File.ReadAllBytes(imagePath);
+            var logo = new StiImage(new RectangleD(x, 0, imageWidth, imageHeight))
+            {
+                ImageBytes = logoBytes,
+                Stretch = true
+            };
+            headerBand.Components.Add(logo);
+
+            // === Title and Parameters ===
+            double titleTop = imageHeight + 0.2;
+            double titleWidth = reportTitle.Length * charWidth; // Calculate width based on character count
+            double titleX = (pageWidth - titleWidth) / 2; // Center X position
+            var titleText = new StiText(new RectangleD(titleX, titleTop, titleWidth, 1))
+            {
+                Text = "{ReportTitle}",
+                HorAlignment = StiTextHorAlignment.Center,
+                Font = new Font("Arial", 16, FontStyle.Bold)
+            };
+            headerBand.Components.Add(titleText);
+
+            // Add Subtitle
+            string subTitleText = "Generated by {GeneratedBy} on {GeneratedDate}";
+            double subTitleTop = titleTop + 0.3; // Adjust position below the title
+            double subTitleWidth = subTitleText.Length * charWidth; // Calculate width based on character count
+            double subTitleX = (pageWidth - subTitleWidth) / 2; // Center X position
+
+            var subTitle = new StiText(new RectangleD(subTitleX, subTitleTop, subTitleWidth, 0.3))
+            {
+                Text = subTitleText,
+                HorAlignment = StiTextHorAlignment.Center,
+                Font = new Font("Arial", 10, FontStyle.Italic)
+            };
+            headerBand.Components.Add(subTitle);
+
+            double cellHeight = 0.3; // cell or row height
+                                     // === Column Headers ===
+            var columnHeader = new StiHeaderBand { Height = cellHeight };
+            page.Components.Add(columnHeader);
+
+            // === Data Band ===
+            var dataBand = new StiDataBand
+            {
+                DataSourceName = "MyData",
+                Height = cellHeight
+            };
+            page.Components.Add(dataBand);
+
+            // Add columns dynamically
+            int columnCount = data.Columns.Count;
+            double colWidth = Math.Round(pageWidth / columnCount, 2);
+            int i = 0;
+            foreach (DataColumn col in data.Columns)
+            {
+                if (string.IsNullOrWhiteSpace(col.ColumnName)) continue;
+
+                // Determine alignment based on column type
+                var isNumeric = col.DataType == typeof(int) || col.DataType == typeof(double)
+                            || col.DataType == typeof(decimal) || col.DataType == typeof(float)
+                            || col.DataType == typeof(long) || col.DataType == typeof(short);
+
+                var horAlignment = isNumeric
+                    ? StiTextHorAlignment.Right
+                    : (col.DataType == typeof(string) ? StiTextHorAlignment.Left : StiTextHorAlignment.Center);
+
+                // HEADER
+                var header = new StiText(new RectangleD(i * colWidth, 0, colWidth, cellHeight))
+                {
+                    Text = col.ColumnName,
+                    HorAlignment = StiTextHorAlignment.Center,
+                    VertAlignment = StiVertAlignment.Center,
+                    Font = new Font("Arial", 10, FontStyle.Bold),
+                    Brush = new StiSolidBrush(Color.LightGray),
+                    Border = new StiBorder()
+                    {
+                        Side = StiBorderSides.All,
+                        Color = Color.Gray,
+                        Size = 0.5,
+                        Style = StiPenStyle.Solid
+                    }
+                };
+                columnHeader.Components.Add(header);
+
+                // DATA CELL
+                var dataText = new StiText(new RectangleD(i * colWidth, 0, colWidth, cellHeight))
+                {
+                    Text = $"{{MyData.{col.ColumnName}}}",
+                    HorAlignment = horAlignment,
+                    VertAlignment = StiVertAlignment.Center,
+                    Font = new Font("Arial", 10, FontStyle.Regular),
+                    CanGrow = true,
+                    WordWrap = true,
+                    Border = new StiBorder()
+                    {
+                        Side = StiBorderSides.Left | StiBorderSides.Right | StiBorderSides.Bottom,
+                        Color = Color.LightGray,
+                        Size = 0.3,
+                        Style = StiPenStyle.Solid //Dash,Dot
+                    }
+                };
+                dataBand.Components.Add(dataText);
+                i++;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            GlobalErrorHandler.ShowMessage($"Error Report Service RunReportAsync: {ex.Message}", true);
+            return null;
         }
 
         return report;
     }
+
+    // Initializing DbContext to resolve nullable field issue
+    public ReportService(SocialFundDbContext dbContext)
+    {
+        DbContext = dbContext;
+    }
+
 }
+
+
+

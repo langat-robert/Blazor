@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Common;
+using System.Text.Json;
 
 
 namespace Backend.Data
@@ -138,7 +139,7 @@ namespace Backend.Data
                         TotalCount = reader.GetInt32(reader.GetOrdinal("TotalCount"))
                     });
                 }
-                
+
             }
             catch (Exception ex)
             {
@@ -163,7 +164,7 @@ namespace Backend.Data
             int? locationId = null,
             int? subCountyId = null,
             int? countyId = null,
-            int? pageNumber = 1, 
+            int? pageNumber = 1,
             int? pageSize = 1)
         {
             var searchapplicants = new List<SearchApplicant>();
@@ -222,7 +223,7 @@ namespace Backend.Data
                         TotalCount = reader.GetInt32(reader.GetOrdinal("TotalCount"))
                     });
                 }
-                
+
                 /* return await Applicants.FromSqlRaw(
                     "EXEC sp_searchApplicant @ApplicantID, @FirstName, @MiddleName, @LastName, @IDNumber, @ContactNumber, @Email, @SexID, @MaritalStatusID, @VillageID",
                     parameters). AsNoTracking().ToListAsync();*/
@@ -462,6 +463,146 @@ namespace Backend.Data
 
             return searchResults;
         }
+        public async Task<List<UserReport>> GetReportsForUserAsync(int userId)
+        {
+            var reports = new List<UserReport>();
+            try
+            {
+                myConn ??= Database.GetDbConnection();
+                if (myConn.State != ConnectionState.Open)
+                {
+                    await myConn.OpenAsync();
+                }
+
+                using var command = myConn.CreateCommand();
+                command.CommandText = "sp_GetUserReports";
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter("@UserID", userId));
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var filtersJson = reader.IsDBNull("Filters") ? "[]" : reader.GetString(reader.GetOrdinal("Filters"));
+                    reports.Add(new UserReport
+                    {
+                        ReportId = reader.GetInt32(reader.GetOrdinal("ReportId")),
+                        Name = reader.GetString(reader.GetOrdinal("Name")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? "" : reader.GetString(reader.GetOrdinal("Description")),
+                        ReportSP = reader.GetString(reader.GetOrdinal("ReportSP")),
+                        Filters = JsonSerializer.Deserialize<List<ReportFilter>>(filtersJson,new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        })
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                GlobalErrorHandler.ShowMessage($"Error fetching reports: {ex.Message}", true);
+            }
+
+            return reports;
+        }
+
+        public async Task<List<SelectOption>> LoadFilterOptionsAsync(
+            string spName,
+            List<DataSourceParameter> parameters,
+            Dictionary<string, object> currentValues)
+        {
+            var result = new List<SelectOption>();
+            try
+            {
+                myConn ??= Database.GetDbConnection();
+                if (myConn.State != ConnectionState.Open)
+                {
+                    await myConn.OpenAsync();
+                }
+
+                using var command = myConn.CreateCommand();
+                command.CommandText = spName;
+                command.CommandType = CommandType.StoredProcedure;
+
+                if (parameters != null)
+                {
+                    foreach (var param in parameters)
+                    {
+                        var paramName = "@" + param.Name;
+
+                        if (!string.IsNullOrEmpty(param.SourceFilter))
+                        {
+                            // Dynamic parameter from another filter's value
+                            if (currentValues.TryGetValue(param.SourceFilter, out var value))
+                            {
+                                command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter(paramName, value ?? DBNull.Value));
+                            }
+                        }
+                        else
+                        {
+                            // Static parameter (e.g., @Codes = 'Sex')
+                            var staticVal = param.StaticValue;
+
+                            // If StaticValue is still a JsonElement, convert it safely
+                            if (staticVal is JsonElement jsonElement)
+                            {
+                                staticVal = jsonElement.ValueKind == JsonValueKind.String
+                                    ? jsonElement.GetString()
+                                    : jsonElement.ToString(); // fallback
+                            }
+                            command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter(paramName, staticVal ?? DBNull.Value));
+    
+                        }
+                    }
+                }
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new SelectOption
+                    {
+                        Value = reader[0]?.ToString(),
+                        Text = reader.FieldCount > 1 ? reader[1]?.ToString() : reader[0]?.ToString()
+                    });
+                }
+            
+            }
+            catch (Exception ex)
+            {
+                GlobalErrorHandler.ShowMessage($"Error Loading Filter Options: {ex.Message}", true);
+                return result;
+            }
+            return result;
+        }
+        public async Task<DataTable> RunReportAsync(string spName, Dictionary<string, object> parameters)
+        {
+            var result = new DataTable();
+            
+            try
+            {
+                myConn ??= Database.GetDbConnection();
+                if (myConn.State != ConnectionState.Open)
+                {
+                    await myConn.OpenAsync().ConfigureAwait(false);
+                }
+
+                using var command = myConn.CreateCommand();
+                command.CommandText = spName;
+                command.CommandType = CommandType.StoredProcedure;
+
+                foreach (var param in parameters)
+                {
+                    command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter("@" + param.Key, param.Value ?? DBNull.Value));
+                }
+
+                using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+                result.Load(reader);
+            }
+            catch (Exception ex)
+            {
+                GlobalErrorHandler.ShowMessage($"Error Running Report: {ex.Message}", true);
+            }
+
+            return result;
+        }
     }
 
     public class Applicant
@@ -668,5 +809,42 @@ namespace Backend.Data
         public DateTime? ModifiedOn { get; set; }
         public string? ModifiedBy { get; set; }
         public int? TotalCount { get; set; } = 0;
+    }
+
+    public class DataSourceParameter
+    {
+        public string Name { get; set; }           // SP parameter name
+        public string? SourceFilter { get; set; }   // Filter to pull the value from
+        public object? StaticValue { get; set; }     // Optional: direct static value like "Sex"
+    }
+
+    public class SelectOption
+    {
+        public string Value { get; set; }
+        public string Text { get; set; }
+
+        // For future use (optional metadata)
+        public Dictionary<string, object> ExtraFields { get; set; } = new();
+    }
+
+    public class ReportFilter
+    {
+        public string Name { get; set; }
+        public string Label { get; set; }
+        public string Type { get; set; } // e.g., Date, Dropdown, Text
+        public bool Required { get; set; }
+
+        public string DataSourceSP { get; set; }
+        public List<DataSourceParameter> DataSourceParameters { get; set; } = new();
+        public List<SelectOption> Options { get; set; } = new();
+    }
+
+    public class UserReport
+    {
+        public int ReportId { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string ReportSP { get; set; }
+        public List<ReportFilter>? Filters { get; set; }
     }
 }

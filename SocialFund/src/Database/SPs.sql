@@ -1,4 +1,95 @@
 
+
+CREATE OR ALTER PROCEDURE spGetVillagesBySubLocation
+(
+	@SubLocationId INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT VillageID,VillageName
+    FROM Village
+	WHERE SubLocationID = @SubLocationId
+    ORDER BY 2;
+END;
+
+GO
+
+CREATE OR ALTER PROCEDURE spGetSubLocationsByLocation
+(
+	@LocationId INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT SubLocationID,SubLocationName
+    FROM SubLocation
+	WHERE LocationID = @LocationId
+    ORDER BY 2;
+END;
+
+GO
+
+CREATE OR ALTER PROCEDURE spGetLocationsBySubCounty
+(
+	@SubCountyId INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT LocationID,LocationName
+    FROM Location
+	WHERE SubCountyID = @SubCountyId
+    ORDER BY 2;
+END;
+
+GO
+
+CREATE OR ALTER PROCEDURE spGetSubCountiesByCounty
+(
+	@CountyId INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT SubCountyID,SubCountyName
+    FROM SubCounty
+	WHERE CountyID = @CountyId
+    ORDER BY 2;
+END;
+
+GO
+
+CREATE OR ALTER PROCEDURE spGetCounties
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT CountyID,CountyName
+    FROM county
+    ORDER BY 2;
+END;
+
+GO
+
+CREATE OR ALTER PROCEDURE sp_GetUserReports
+	@UserID			INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+	--@UserID implement permission logic 
+    SELECT ReportID, Name, Description, ReportSP, Filters
+    FROM Reports
+	WHERE IsActive=1 
+	ORDER BY 2;
+END;
+
+GO
+
 CREATE OR ALTER PROCEDURE GetUserByUsername
     @Username VARCHAR(100)
 AS

@@ -76,3 +76,23 @@ a, .btn-link {
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
+
+.filter-section {
+    margin-bottom: 1rem;
+}
+.filter-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filter-item {
+    display: flex;
+    flex-direction: column;
+}
+.filter-heading h6 {
+    margin-bottom: 0.75rem;
+    padding-top: 8px;
+    font-weight: bold;
+}

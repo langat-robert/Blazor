@@ -7,9 +7,14 @@
     </div>
 </div> *@
 
+@using Backend.Data
+@inject Backend.Data.SocialFundDbContext DbContext
+@inject UserSessionService UserSession
 @inject ReportService ReportService
 @using Stimulsoft.Report
+@using Stimulsoft.Report.Components
 @using Stimulsoft.Base
+@using Stimulsoft.Base.Drawing
 @using Stimulsoft.Report.Blazor
 
 <LoadingOverlay IsVisible="@isLoading" />
@@ -20,9 +25,60 @@
     <div class="row">
         <div class="col-12 text-center mb-3">
             <h5>Reports</h5>
+        </div>        
+        <div class="col-12 text-center mb-3">
+            <select id="reportSelect" class="form-select" @onchange="OnReportSelected">
+                <option value="">-- Select Report --</option>
+                @foreach (var report in allReports)
+                {
+                    <option value="@report.ReportId">@report.Name</option>
+                }
+            </select>
         </div>
+        @if (selectedReport != null)
+        {
+            <div class="filter-section">
+                <div class="filter-heading">
+                    <h6>@selectedReport.Name Filters</h6>
+                </div>
+                <div class="filter-container">
+                    @if (selectedReport.Filters != null)
+                    {    
+                        @foreach (var filter in selectedReport.Filters)
+                        {
+                            <div class="filter-item">
+                                <label>@filter.Label</label>
+                                @if (filter.Type == "Dropdown")
+                                {
+                                    <select @onchange="(e) => OnFilterChanged(filter.Name, e.Value?.ToString())"
+                                            disabled="@(ShouldDisableFilter(filter.Name))">
+                                        <option value="">-- Select --</option>
+                                        @foreach (var option in filter.Options)
+                                        {
+                                            <option value="@option.Value">@option.Text</option>
+                                        }
+                                    </select>
+                                }
+                                else if (filter.Type == "Date")
+                                {
+                                    <input type="date" @bind-value="selectedDateValues[filter.Name]"
+                                    @bind-value:event="oninput" @onchange="(e) => OnDateChanged(filter.Name, e.Value?.ToString())" />
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-primary" @onclick="RunSelectedReportAsync">Run Report</button>
+                </div>
+            </div>
+        }
+
         <div class="col-12 mb-4">
-            <StiBlazorViewer Report="@Report" Height="800px"  Width="100%"/>
+            @if (Report != null)
+            {
+                <StiBlazorViewer Report="@Report" Height="800px"  Width="100%"/>
+            }
         </div>
     </div>
 </div>
@@ -30,7 +86,28 @@
 @code {
     private bool isLoading = true;
     private StiReport Report;
+    private List<UserReport> allReports = new();
+    private UserReport? selectedReport;
+    private Dictionary<string, object> selectedFilterValues = new();
+    private Dictionary<string, DateTime?> selectedDateValues = new();
 
+    private Dictionary<string, object> GetCombinedFilterValues()
+    {
+        try
+        {
+            return selectedFilterValues;
+                //.Concat(selectedDateValues.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value))
+                //.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error combining filter values: {ex.Message}");
+            return new Dictionary<string, object>();
+        }
+    }
+
+    private string? UserId;
+    private bool showResults = false;
 @* ShowExportToPdf="true"
 ShowExportToExcel="true"
 ShowExportToWord="true"
@@ -44,7 +121,9 @@ ShowBookmarksPanel="true" *@
         await Task.Delay(100); // optional UI yield
         try
         {
-            Report = ReportService.CreateDynamicReport("My Report Title", "Robert");
+            UserId = UserSession.GetUserID();
+            allReports = await DbContext.GetReportsForUserAsync(userId: 123);
+            //Report = ReportService.CreateDynamicReport("My Report Title", "Robert");
 
             //Create empty report object
             //this.Report = new StiReport();
@@ -61,4 +140,159 @@ ShowBookmarksPanel="true" *@
             await InvokeAsync(StateHasChanged);
         }
     }
+
+    private async Task OnReportSelected(ChangeEventArgs e)
+    {
+        try
+        {
+            selectedFilterValues.Clear();
+            selectedDateValues.Clear();
+
+            if (int.TryParse(e.Value?.ToString(), out var reportId))
+            {
+                selectedReport = allReports.FirstOrDefault(r => r.ReportId == reportId);
+
+                if (selectedReport != null)
+                {
+                    // Initialize date filters
+                    foreach (var filter in selectedReport.Filters.Where(f => f.Type == "Date"))
+                    {
+                        selectedDateValues[filter.Name] = null;
+                    }
+                    // Only load top-level filter: County
+                    //var countyFilter = selectedReport.Filters.FirstOrDefault(f => f.Name == "County");
+                    var countyFilter = GetFilterByName("CountyID");
+                    if (countyFilter != null  && countyFilter.Type == "Dropdown")
+                    {
+                        countyFilter.Options = await DbContext.LoadFilterOptionsAsync(
+                            countyFilter.DataSourceSP,
+                            countyFilter.DataSourceParameters,
+                            selectedFilterValues
+                        );
+                    }
+                    // Load Gender Dropdown
+                    var genderFilter = GetFilterByName("SexID");
+                    if (genderFilter != null && genderFilter.Type == "Dropdown")
+                    {
+                        genderFilter.Options = await DbContext.LoadFilterOptionsAsync(
+                            genderFilter.DataSourceSP,
+                            genderFilter.DataSourceParameters,
+                            selectedFilterValues
+                        );
+                    }
+                    // Load Marital Status Dropdown
+                    var maritalStatusFilter = GetFilterByName("MaritalStatusID");
+                    if (maritalStatusFilter != null && maritalStatusFilter.Type == "Dropdown")
+                    {
+                        maritalStatusFilter.Options = await DbContext.LoadFilterOptionsAsync(
+                            maritalStatusFilter.DataSourceSP,
+                            maritalStatusFilter.DataSourceParameters,
+                            selectedFilterValues
+                        );
+                    }
+                }
+            }
+            else
+            {
+                selectedReport = null;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in OnReportSelected: {ex.Message}");
+        }
+    }
+
+    private async Task OnFilterChanged(string filterName, string? value)
+    {
+        selectedFilterValues[filterName] = value ?? "";
+
+        if (filterName == "CountyID")
+        {
+            await ReloadDropdown("SubCountyID");
+            ClearFilterOptions("LocationID");
+        }
+        else if (filterName == "SubCountyID")
+        {
+            await ReloadDropdown("LocationID");
+            ClearFilterOptions("SubLocationID");
+        }
+        else if (filterName == "LocationID")
+        {
+            await ReloadDropdown("SubLocationID");
+            ClearFilterOptions("VillageID");
+        }
+        else if (filterName == "SubLocationID")
+        {
+            await ReloadDropdown("VillageID");
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ReloadDropdown(string filterName)
+    {
+        ClearFilterOptions(filterName);
+        var filter = selectedReport?.Filters.FirstOrDefault(f => f.Name == filterName);
+        if (filter != null)
+        {
+            filter.Options = await DbContext.LoadFilterOptionsAsync(
+                filter.DataSourceSP,
+                filter.DataSourceParameters,
+                selectedFilterValues
+            );
+        }
+    }
+
+    private void ClearFilterOptions(string filterName)
+    {
+        var filter = selectedReport?.Filters.FirstOrDefault(f => f.Name == filterName);
+        if (filter != null)
+        {
+            filter.Options.Clear();
+            selectedFilterValues.Remove(filterName);
+        }
+    }
+
+    private bool ShouldDisableFilter(string filterName)
+    {
+        return (filterName == "SubCountyID" && !selectedFilterValues.ContainsKey("CountyID")) ||
+            (filterName == "LocationID" && !selectedFilterValues.ContainsKey("SubCountyID")) ||
+            (filterName == "SubLocationID" && !selectedFilterValues.ContainsKey("LocationID")) ||
+            (filterName == "VillageID" && !selectedFilterValues.ContainsKey("SubLocationID"));
+    }
+    private void OnDateChanged(string filterName, string? value)
+    {
+        if (DateTime.TryParse(value, out var date))
+        {
+            selectedFilterValues[filterName] = date.ToString("yyyy-MM-dd");
+            selectedDateValues[filterName] = date;
+        }
+        else
+        {
+            selectedFilterValues.Remove(filterName);
+            selectedDateValues[filterName] = null;
+        }
+    }
+
+    private ReportFilter? GetFilterByName(string name)
+    {
+        return selectedReport?.Filters
+            .FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+    private async Task RunSelectedReportAsync()
+    {
+        if (selectedReport == null)
+            return;
+        //Report = ReportService.CreateDynamicReport("My Report Title", "Robert");
+        isLoading = true;
+        var parameters = GetCombinedFilterValues();
+        Report = ReportService.RunReportAsync(selectedReport, parameters, "Robert");
+        //Report = ReportService.CreateDynamicReport("My Report Title", "Robert");
+        StateHasChanged();
+        isLoading = false;
+        showResults = true;
+    }
+
 }
