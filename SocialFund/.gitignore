@@ -1,0 +1,33 @@
+# Ignore build output
+src/Backend/bin/
+src/Backend/obj/
+
+# Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore logs
+*.log
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+
+# Ignore compressed files
+*.zip
+*.rar
+
+# Ignore database backups
+*.bak
+
+# Ignore generated files
+src/Backend/Reports/*.mrt
+
+# Ignore other unnecessary files
+src/Backend/wwwroot/images/logo.PNG
